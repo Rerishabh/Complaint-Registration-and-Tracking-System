@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.complainttracking.controller.AdminLoginController"
+            styleClass="root-pane">
+
+    <!-- Top Bar with Back Button -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="16">
+            <padding><Insets top="20" right="32" bottom="10" left="32"/></padding>
+            <Button text="&#8592; Back to Home"
+                    styleClass="btn-back"
+                    onAction="#handleBackToWelcome"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label text="CRTS &#8226; Administrator Portal" styleClass="form-subtitle"/>
+        </HBox>
+    </top>
+
+    <!-- Center Card -->
+    <center>
+        <VBox alignment="CENTER">
+            <padding><Insets top="10" right="30" bottom="30" left="30"/></padding>
+
+            <VBox styleClass="form-card" maxWidth="440" spacing="18">
+                <padding><Insets top="36" right="36" bottom="36" left="36"/></padding>
+
+                <!-- Header -->
+                <VBox spacing="6" alignment="CENTER_LEFT">
+                    <HBox alignment="CENTER_LEFT" spacing="10">
+                        <Label text="&#128737;" styleClass="card-icon"/>
+                        <VBox spacing="2">
+                            <HBox alignment="CENTER_LEFT" spacing="8">
+                                <Label text="Admin Login" styleClass="form-title"/>
+                                <Label text="Restricted" styleClass="badge-admin"/>
+                            </HBox>
+                            <Label text="Administrative access for complaint management" styleClass="form-subtitle"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+
+                <Separator/>
+
+                <!-- Form Fields -->
+                <VBox spacing="14">
+                    <!-- Username -->
+                    <VBox spacing="6">
+                        <Label text="Admin Username" styleClass="form-label"/>
+                        <TextField fx:id="usernameField"
+                                   promptText="e.g., admin"
+                                   maxWidth="Infinity"/>
+                    </VBox>
+
+                    <!-- Password -->
+                    <VBox spacing="6">
+                        <Label text="Password" styleClass="form-label"/>
+                        <PasswordField fx:id="passwordField"
+                                       promptText="Enter admin password"
+                                       maxWidth="Infinity"/>
+                    </VBox>
+                </VBox>
+
+                <!-- Status / Error Label -->
+                <Label fx:id="statusLabel"
+                       text=""
+                       styleClass="form-error-label"
+                       wrapText="true"/>
+
+                <!-- Actions -->
+                <VBox spacing="12" alignment="CENTER">
+                    <Button fx:id="loginButton"
+                            text="Log In as Administrator"
+                            styleClass="btn-secondary"
+                            maxWidth="Infinity"
+                            defaultButton="true"
+                            onAction="#handleLogin"/>
+
+                    <Label text="Default credentials: admin / Admin@123"
+                           styleClass="card-desc"
+                           wrapText="true"
+                           textAlignment="CENTER"/>
+                </VBox>
+
+            </VBox>
+        </VBox>
+    </center>
+
+</BorderPane>
+

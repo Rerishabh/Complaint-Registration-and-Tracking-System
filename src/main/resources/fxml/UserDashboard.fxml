@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<!--
+  UserDashboard.fxml
+  Three logical content sections toggled by sidebar nav:
+    1. overviewSection   – KPI cards + recent complaints table
+    2. submitSection     – Submit Complaint form
+    3. myComplaintsSection – Searchable TableView + View History button
+-->
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.complainttracking.controller.UserDashboardController"
+            prefWidth="1050" prefHeight="680"
+            styleClass="root-pane">
+
+    <!-- =================== LEFT SIDEBAR =================== -->
+    <left>
+        <VBox styleClass="dashboard-sidebar" prefWidth="230" spacing="4">
+            <padding><Insets top="28" right="16" bottom="28" left="16"/></padding>
+
+            <!-- Brand -->
+            <VBox spacing="2">
+                <padding><Insets bottom="12"/></padding>
+                <Label text="&#9881;  CRTS" styleClass="dashboard-sidebar-title"/>
+                <Label text="User Portal" styleClass="dashboard-sidebar-subtitle"/>
+            </VBox>
+            <Separator style="-fx-background-color: #334155;" opacity="0.5">
+                <VBox.margin><Insets top="4" bottom="12"/></VBox.margin>
+            </Separator>
+
+            <!-- Nav Buttons -->
+            <Button fx:id="navOverviewBtn"
+                    text="&#127968;  Dashboard"
+                    styleClass="nav-btn nav-btn-active"
+                    onAction="#handleNavOverview"/>
+            <Button fx:id="navSubmitBtn"
+                    text="&#10133;  Submit Complaint"
+                    styleClass="nav-btn"
+                    onAction="#handleNavSubmit"/>
+            <Button fx:id="navMyComplaintsBtn"
+                    text="&#128203;  My Complaints"
+                    styleClass="nav-btn"
+                    onAction="#handleNavMyComplaints"/>
+
+            <!-- Spacer -->
+            <Region VBox.vgrow="ALWAYS"/>
+
+            <Separator style="-fx-background-color: #334155;" opacity="0.5">
+                <VBox.margin><Insets bottom="8"/></VBox.margin>
+            </Separator>
+            <Button text="&#8594;  Logout"
+                    styleClass="nav-btn-logout"
+                    onAction="#handleLogout"/>
+        </VBox>
+    </left>
+
+    <!-- =================== MAIN AREA =================== -->
+    <center>
+        <VBox>
+            <!-- TOP HEADER BAR -->
+            <HBox styleClass="dashboard-header" alignment="CENTER_LEFT" spacing="16">
+                <padding><Insets top="14" right="28" bottom="14" left="28"/></padding>
+                <VBox spacing="2">
+                    <Label fx:id="headerUserName" text="User Name" styleClass="dashboard-header-title"/>
+                    <Label fx:id="headerDepartment" text="" styleClass="dashboard-header-dept"/>
+                </VBox>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="&#128100;" style="-fx-font-size: 28px;"/>
+            </HBox>
+
+            <!-- CONTENT SCROLL PANE -->
+            <ScrollPane VBox.vgrow="ALWAYS" fitToWidth="true"
+                        style="-fx-background-color: #F8FAFC; -fx-background: #F8FAFC;">
+
+                <VBox spacing="0" style="-fx-background-color: #F8FAFC;">
+
+                    <!-- ========== SECTION 1: OVERVIEW ========== -->
+                    <VBox fx:id="overviewSection" spacing="24" visible="true" managed="true">
+                        <padding><Insets top="28" right="28" bottom="28" left="28"/></padding>
+
+                        <!-- Section heading -->
+                        <VBox spacing="4">
+                            <Label text="Dashboard Overview" styleClass="section-title"/>
+                            <Label text="Summary of your complaint activity" styleClass="section-subtitle"/>
+                        </VBox>
+
+                        <!-- KPI Cards -->
+                        <HBox spacing="16">
+                            <VBox styleClass="kpi-card" alignment="CENTER" spacing="6">
+                                <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+                                <Label fx:id="kpiTotal" text="0" styleClass="kpi-value"/>
+                                <Label text="TOTAL" styleClass="kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="kpi-card kpi-open" alignment="CENTER" spacing="6">
+                                <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+                                <Label fx:id="kpiOpen" text="0" styleClass="kpi-value" style="-fx-text-fill: #D97706;"/>
+                                <Label text="OPEN" styleClass="kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="kpi-card kpi-inprog" alignment="CENTER" spacing="6">
+                                <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+                                <Label fx:id="kpiInProgress" text="0" styleClass="kpi-value" style="-fx-text-fill: #2563EB;"/>
+                                <Label text="IN PROGRESS" styleClass="kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="kpi-card kpi-done" alignment="CENTER" spacing="6">
+                                <padding><Insets top="20" right="24" bottom="20" left="24"/></padding>
+                                <Label fx:id="kpiResolved" text="0" styleClass="kpi-value" style="-fx-text-fill: #16A34A;"/>
+                                <Label text="RESOLVED" styleClass="kpi-label"/>
+                            </VBox>
+                        </HBox>
+
+                        <!-- Recent Complaints -->
+                        <VBox spacing="10">
+                            <Label text="Recent Complaints" styleClass="section-title"/>
+                            <TableView fx:id="recentTable" prefHeight="220">
+                                <columns>
+                                    <TableColumn fx:id="recentTrackingCol" text="Tracking ID"  prefWidth="130"/>
+                                    <TableColumn fx:id="recentTitleCol"    text="Title"         prefWidth="260"/>
+                                    <TableColumn fx:id="recentStatusCol"   text="Status"        prefWidth="120"/>
+                                    <TableColumn fx:id="recentDateCol"     text="Submitted"     prefWidth="175"/>
+                                </columns>
+                                <placeholder>
+                                    <Label text="No complaints yet. Click 'Submit Complaint' to get started."
+                                           styleClass="form-subtitle"/>
+                                </placeholder>
+                            </TableView>
+                        </VBox>
+
+                    </VBox>
+
+                    <!-- ========== SECTION 2: SUBMIT COMPLAINT ========== -->
+                    <VBox fx:id="submitSection" spacing="20" visible="false" managed="false">
+                        <padding><Insets top="28" right="28" bottom="28" left="28"/></padding>
+
+                        <VBox spacing="4">
+                            <Label text="Submit a New Complaint" styleClass="section-title"/>
+                            <Label text="Fill in all required fields to register your complaint"
+                                   styleClass="section-subtitle"/>
+                        </VBox>
+
+                        <VBox styleClass="form-card" spacing="18" maxWidth="680">
+                            <padding><Insets top="28" right="32" bottom="28" left="32"/></padding>
+
+                            <!-- Title -->
+                            <VBox spacing="6">
+                                <Label text="Complaint Title  *" styleClass="form-label"/>
+                                <TextField fx:id="titleField" promptText="Brief title (5–150 characters)"
+                                           maxWidth="Infinity"/>
+                            </VBox>
+
+                            <!-- Category + Priority row -->
+                            <HBox spacing="20">
+                                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                    <Label text="Category  *" styleClass="form-label"/>
+                                    <ComboBox fx:id="categoryCombo" maxWidth="Infinity"/>
+                                </VBox>
+                                <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                    <Label text="Priority  *" styleClass="form-label"/>
+                                    <ComboBox fx:id="priorityCombo" maxWidth="Infinity"/>
+                                </VBox>
+                            </HBox>
+
+                            <!-- Location/Room -->
+                            <VBox spacing="6">
+                                <Label text="Location / Room No. (optional)" styleClass="form-label"/>
+                                <TextField fx:id="locationField" promptText="e.g. Block C, Room 204"
+                                           maxWidth="Infinity"/>
+                            </VBox>
+
+                            <!-- Description -->
+                            <VBox spacing="6">
+                                <Label text="Description  *" styleClass="form-label"/>
+                                <TextArea fx:id="descriptionArea"
+                                          promptText="Describe your complaint in detail (minimum 15 characters)…"
+                                          prefRowCount="5" wrapText="true" maxWidth="Infinity"/>
+                            </VBox>
+
+                            <!-- Status + Submit -->
+                            <Label fx:id="submitStatusLabel" text="" styleClass="form-error-label"
+                                   wrapText="true"/>
+
+                            <HBox alignment="CENTER_RIGHT">
+                                <Button fx:id="submitButton"
+                                        text="Submit Complaint"
+                                        styleClass="btn-success"
+                                        onAction="#handleSubmitComplaint"/>
+                            </HBox>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ========== SECTION 3: MY COMPLAINTS ========== -->
+                    <VBox fx:id="myComplaintsSection" spacing="16" visible="false" managed="false">
+                        <padding><Insets top="28" right="28" bottom="28" left="28"/></padding>
+
+                        <VBox spacing="4">
+                            <Label text="My Complaints" styleClass="section-title"/>
+                            <Label text="View and filter all your submitted complaints"
+                                   styleClass="section-subtitle"/>
+                        </VBox>
+
+                        <!-- Filter Bar -->
+                        <HBox spacing="12" alignment="CENTER_LEFT">
+                            <TextField fx:id="searchField"
+                                       promptText="&#128269;  Search by title, ID, or category…"
+                                       styleClass="search-field"
+                                       prefWidth="300"/>
+                            <ComboBox fx:id="statusFilterCombo" prefWidth="160"/>
+                            <Region HBox.hgrow="ALWAYS"/>
+                            <Button text="&#128065;  View History / Details"
+                                    styleClass="btn-outline"
+                                    onAction="#handleViewHistory"/>
+                        </HBox>
+
+                        <!-- Complaints Table -->
+                        <TableView fx:id="complaintsTable" VBox.vgrow="ALWAYS" prefHeight="380">
+                            <columns>
+                                <TableColumn fx:id="colTracking"  text="Tracking ID" prefWidth="130"/>
+                                <TableColumn fx:id="colTitle"     text="Title"        prefWidth="230"/>
+                                <TableColumn fx:id="colCategory"  text="Category"     prefWidth="130"/>
+                                <TableColumn fx:id="colPriority"  text="Priority"     prefWidth="90"/>
+                                <TableColumn fx:id="colStatus"    text="Status"       prefWidth="110"/>
+                                <TableColumn fx:id="colDate"      text="Submitted"    prefWidth="170"/>
+                            </columns>
+                            <placeholder>
+                                <Label text="No complaints found matching your filter."
+                                       styleClass="form-subtitle"/>
+                            </placeholder>
+                        </TableView>
+
+                        <Label text="Tip: Select a row then click 'View History / Details' to see the full timeline."
+                               styleClass="form-subtitle"/>
+
+                    </VBox>
+
+                </VBox>
+            </ScrollPane>
+        </VBox>
+    </center>
+
+</BorderPane>
+
