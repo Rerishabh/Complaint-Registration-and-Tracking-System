@@ -1,346 +1,371 @@
 # Complaint Registration and Tracking System (CRTS)
 
-A professional Java desktop application for registering, tracking, assigning, and resolving complaints.  
-Built with **Java 21**, **JavaFX 21**, **JDBC**, and **MySQL** as part of an academic Java project.
+The **Complaint Registration and Tracking System (CRTS)** is a desktop application developed in Java and JavaFX for educational and institutional environments. The platform streamlines issue reporting, status lifecycle management, staff assignment, and complaint resolution.
+
+Students and institutional users can register accounts, submit categorized complaints with specified priority levels, receive automatic tracking identifiers, monitor progress through an audit timeline, and review in-app status updates. Administrators can monitor system-wide key performance indicators (KPIs), inspect incoming complaints, enforce valid status transitions, assign tickets to staff, record resolution notes, review analytical charts, and export reports to CSV.
 
 ---
 
-## Project Objectives
+## Table of Contents
 
-- Allow users to register, log in, submit complaints with categorization and priority, and track status with a unique tracking code.
-- Allow administrators to log in securely, monitor key operational KPIs, filter complaints, update statuses with strict lifecycle enforcement, assign complaints to specific staff, and record detailed resolutions.
-- Provide users with full visibility into the assigned staff member, resolution records, and audit timeline.
-- Maintain a complete audit trail of all status transitions, staff assignments, and resolutions.
+- [Key Features](#key-features)
+  - [User Portal](#user-portal)
+  - [Admin Portal](#admin-portal)
+- [System Requirements](#system-requirements)
+- [Technology Stack](#technology-stack)
+- [Application Architecture](#application-architecture)
+- [Application Screens and Workflow](#application-screens-and-workflow)
+- [Complaint Status Lifecycle](#complaint-status-lifecycle)
+- [Project Structure](#project-structure)
+- [Database Configuration](#database-configuration)
+- [Installation and Setup](#installation-and-setup)
+- [Automated Testing](#automated-testing)
+- [Security Practices](#security-practices)
+- [Future Enhancements](#future-enhancements)
+- [Author](#author)
+
+---
+
+## Key Features
+
+### User Portal
+
+- **User Authentication**: Secure user registration and login with input validation and BCrypt password hashing.
+- **Complaint Submission**: Form submission capturing title, category, priority, and detailed problem descriptions.
+- **Unique Tracking Code Generation**: Generates persistent identifiers formatted as `CMP-YYYY-XXXX` upon successful submission.
+- **Personal Dashboard**: Overview metrics displaying total submitted, open, in-progress, and resolved complaints.
+- **Search & Filtering**: Search complaints by title, tracking code, or category, combined with dynamic status filtering (`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `REJECTED`).
+- **Audit History Timeline**: Interactive modal displaying the complete chronological audit trail, distinguishing staff assignments from genuine status changes.
+- **Resolution Transparency**: Displays detailed resolution notes, resolving administrator name, and timestamp once resolved.
+- **In-App Notifications**: Notification badge with unread counters, mark-as-read controls, and one-click navigation to referenced complaints.
+- **Public Tracking Lookup**: Unauthenticated tracking lookup from the Welcome Screen that enforces privacy by masking complainant details and internal administrator remarks.
+
+### Admin Portal
+
+- **Administrative Authentication**: Secure role-based login (`ADMIN`, `STAFF`, `SUPERADMIN`) enforcing isolated administrative sessions.
+- **System-wide KPI Overview**: System-wide metric counters displaying Total, Open, In Progress, Resolved, and Rejected complaints.
+- **Complaint Management**: Centralized table view of all institutional complaints with complainant details, category, priority, status, and assigned staff member.
+- **Search & Multi-Criteria Filtering**: Filter complaints across status, category, and priority dropdowns, alongside real-time search across titles, tracking codes, complainant names, and emails.
+- **Strict Status Lifecycle Enforcement**: State machine validation governing transitions between `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`. Rejects invalid transitions and no-op updates (e.g., `OPEN → OPEN`).
+- **Staff Assignment**: Assign or reassign complaints to available administrators or staff members, recording audit history without altering ticket status.
+- **Resolution Recording**: Enforces mandatory resolution notes (minimum 10 characters) and records the resolving administrator within an atomic database transaction.
+- **Analytical Reports & Charts**:
+  - Category distribution (`PieChart`).
+  - Status frequency breakdown (`BarChart`).
+  - Department complaint volume comparison (`BarChart`).
+  - Monthly registration trends over time (`LineChart`).
+- **Date-Range Filtering**: Dynamic start-date and end-date pickers to scope analytical reports to custom time windows.
+- **Staff Performance Metrics**: Table displaying assigned volume, resolved count, resolution rate percentage, and average resolution time per staff member.
+- **CSV Report Export**: Generates RFC 4180-compliant CSV reports with UTF-8 BOM encoding for direct spreadsheet compatibility.
+
+---
+
+## System Requirements
+
+| Requirement | Minimum Supported Version | Notes |
+| :--- | :--- | :--- |
+| **Java JDK** | 21 | Eclipse Temurin or Oracle OpenJDK 21 |
+| **JavaFX** | 21 | Configured via Maven dependencies (`javafx-controls`, `javafx-fxml`) |
+| **MySQL Server** | 8.0+ | InnoDB storage engine with `utf8mb4` character set |
+| **Apache Maven** | 3.8+ | Used for dependency resolution, compilation, testing, and packaging |
+| **Operating System** | Windows 10 / 11 | Primary documented environment for setup scripts and PowerShell commands |
 
 ---
 
 ## Technology Stack
 
-| Layer        | Technology             | Version | Purpose |
-|--------------|------------------------|---------|---------|
-| Language     | Java (Eclipse Temurin) | 21      | Core application backend |
-| GUI          | JavaFX + FXML          | 21      | Desktop user interface and layouts |
-| Styling      | JavaFX CSS             | –       | Modern dark-navy & clean enterprise theme |
-| Database     | MySQL                  | 8.x     | Relational data storage (InnoDB engine) |
-| Connectivity | JDBC (MySQL Connector) | 8.3.0   | Database connectivity via PreparedStatement |
-| Security     | BCrypt (jBCrypt)       | 0.4     | Salted password hashing (cost factor 12) |
-| Build Tool   | Apache Maven           | 3.10.0  | Dependency management and build lifecycle |
-| Testing      | JUnit Jupiter          | 5.10.2  | Automated unit and integration testing (116 tests) |
+The application dependencies and build plugins are defined in `pom.xml`:
+
+| Component | Technology | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Language** | Java (JDK) | 21 | Core backend and application logic |
+| **UI Framework** | JavaFX Controls & FXML | 21 | Modular desktop graphical interface |
+| **UI Styling** | JavaFX CSS | — | Cohesive custom enterprise styling (`styles.css`) |
+| **Database** | MySQL | 8.x | Relational database storage (InnoDB engine) |
+| **Driver / Connectivity** | MySQL Connector/J | 8.3.0 | JDBC database driver |
+| **Password Hashing** | jBCrypt | 0.4 | Salted password hashing (cost factor 12) |
+| **Build Tool** | Apache Maven | 3.8+ | Build lifecycle and dependency management |
+| **Testing Framework** | JUnit Jupiter | 5.10.2 | Unit testing and business logic test execution |
 
 ---
 
-## Architecture
+## Application Architecture
 
-This project strictly adheres to the **MVC (Model-View-Controller)** pattern with distinct layers:
+The project follows a layered MVC-based architecture, separating JavaFX presentation, business logic, database persistence, and shared utilities:
+
+| Layer | Responsibility |
+| :--- | :--- |
+| **Controller** | Handles JavaFX UI interactions, user input, dialogs, and view navigation |
+| **Service** | Contains business logic, validation, state transition rules, and authorization checks |
+| **DAO** | Handles database persistence, SQL queries, and transactional updates through JDBC |
+| **Model** | Represents domain entities and data transfer objects mapping database records |
+| **Database** | Manages MySQL JDBC connectivity, credentials resolution, and connection lifecycle |
+| **Util** | Provides in-memory session management, navigation helpers, and shared utilities |
+
+---
+
+## Application Screens and Workflow
+
+### Core Workflow
 
 ```
-com.complainttracking/
-├── Main.java                       ← JavaFX application entry point
-├── model/                          ← Domain entity models (Plain Java Objects)
-│   ├── User.java
-│   ├── Admin.java
-│   ├── Complaint.java              ← Full complaint entity with assignee & resolution info
-│   ├── ComplaintHistory.java       ← Audit trail event entity
-│   ├── Resolution.java             ← Resolution notes and resolver metadata entity
-│   ├── Notification.java           ← User in-app notification entity
-│   ├── ReportSummary.java          ← Consolidated executive metrics & chart summaries
-│   ├── DepartmentStat.java         ← Department-wise complaint aggregations
-│   └── StaffPerformance.java       ← Staff resolution volume, speed, and percentage
-├── dao/                            ← Data Access Objects (JDBC PreparedStatement operations)
-│   ├── UserDAO.java
-│   ├── AdminDAO.java
-│   ├── ComplaintDAO.java           ← Multi-table queries, transactions (status, assign, resolve, notifs)
-│   ├── ComplaintHistoryDAO.java
-│   ├── ResolutionDAO.java          ← Resolution storage and retrieval
-│   ├── NotificationDAO.java        ← In-app notifications CRUD & transactional inserts
-│   └── ReportDAO.java              ← Analytical queries, distributions, trends & performance
-├── service/                        ← Business logic, validation, and transaction orchestrators
-│   ├── AuthenticationService.java
-│   ├── ComplaintService.java       ← User complaint creation & ownership validation
-│   ├── AdminComplaintService.java  ← Admin stats, filtering, assignees, status updates
-│   ├── ResolutionService.java      ← State transition validation, resolution rules & transactions
-│   ├── NotificationService.java    ← Notification querying, ownership verification, unread counts
-│   └── ReportService.java          ← Admin authorization, date-range filtering & CSV export
-├── controller/                     ← JavaFX UI controllers (Event Handling)
-│   ├── WelcomeController.java         ← Public entry & unauthenticated tracking lookup
-│   ├── UserLoginController.java
-│   ├── UserRegisterController.java
-│   ├── AdminLoginController.java
-│   ├── UserDashboardController.java   ← User portal: submit, track, view history, Notification Center
-│   └── AdminDashboardController.java  ← Admin portal: KPIs, status, assign, resolve & Analytical Reports
-├── database/                       ← JDBC connection singleton
-│   └── DatabaseConnection.java
-└── util/                           ← Session management & navigation helpers
-    ├── SessionManager.java
-    └── NavigationHelper.java
+[User Registration / Login]
+           │
+           ▼
+[Submit Complaint] ────► [System Generates CMP-YYYY-XXXX Tracking Code]
+                                     │
+                                     ▼
+                    [Admin Reviews & Assigns Staff]
+                                     │
+                                     ▼
+                     [Admin Updates Status to IN_PROGRESS]
+                                     │
+                                     ▼
+                     [Admin Resolves Ticket with Notes]
+                                     │
+                                     ▼
+            [User Views Updated Status, Timeline & Resolution]
 ```
 
+1. **User Registration & Login**: The user registers with their name, email, department, phone, and password, then authenticates.
+2. **Complaint Submission**: The user submits a ticket. Category choices include *Infrastructure*, *IT & Network*, *Academic*, *Hostel & Facilities*, *Administration*, and *Other*.
+3. **Tracking Code Generation**: A unique tracking identifier (`CMP-YYYY-XXXX`) is assigned immediately.
+4. **Staff Assignment**: An administrator inspects the ticket in the Admin Dashboard and assigns an investigator.
+5. **Status Update**: The ticket status is updated to `IN_PROGRESS` with mandatory administrator remarks.
+6. **Resolution**: Upon resolving the issue, the administrator provides detailed resolution notes, transitioning the ticket to `RESOLVED`.
+7. **Audit & Notifications**: The user receives in-app notifications and can inspect the full status history timeline.
+
+### Application Screens
+
+- **Welcome Screen (`WelcomeScreen.fxml`)**: Main entry screen offering quick navigation to User Login, Admin Login, and a public Quick Complaint Tracking dialog.
+- **User Login & Registration (`UserLogin.fxml`, `UserRegister.fxml`)**: Authentication forms featuring validation feedback.
+- **User Dashboard (`UserDashboard.fxml`)**: Overview cards, complaint registration form, filterable complaint list, history inspection dialog, and the In-App Notification Center.
+- **Admin Login (`AdminLogin.fxml`)**: Administrative authentication portal.
+- **Admin Dashboard (`AdminDashboard.fxml`)**: System management console containing KPI counters, complaint data table, status update and assignment dialogs, resolution modals, analytical charts, date filtering, staff performance metrics, and CSV report export.
+
 ---
 
-## Database Schema & Migrations
+## Complaint Status Lifecycle
 
-The database consists of five relational tables designed with foreign key constraints, indexes, and full referential integrity:
+Complaint status changes are strictly validated by `ResolutionService.isValidStatusTransition(...)` and guarded against no-op updates by `AdminComplaintService`:
 
-1. **`users`**: User profile, contact information, department, and BCrypt salted password hash.
-2. **`admins`**: Administrator/staff credentials, role (`ADMIN`, `STAFF`, `SUPERADMIN`), and password hash.
-3. **`complaints`**: Core complaint data with `tracking_code`, `status`, `assigned_admin_id`, and timestamps.
-4. **`complaint_history`**: Immutable status transition and assignment audit log (`old_status`, `new_status`, `changed_by`, `note`, `changed_at`).
-5. **`resolutions`**: Detailed resolution records (`resolution_id`, `complaint_id`, `admin_id`, `resolution_notes`, `resolved_at`).
+| Status | Description | Permitted Next Statuses | Prerequisites / Triggers |
+| :--- | :--- | :--- | :--- |
+| `OPEN` | Newly registered complaint awaiting initial administrator review | `IN_PROGRESS`, `REJECTED` | Awaiting administrator review; can be moved to `IN_PROGRESS` or `REJECTED` through an authorized status update. |
+| `IN_PROGRESS` | Complaint actively under investigation or troubleshooting by staff | `RESOLVED`, `REJECTED`, `OPEN` | Requires detailed resolution notes (&ge; 10 characters) to resolve, rejection remarks to reject, or can be re-queued to `OPEN`. |
+| `RESOLVED` | Issue resolved by staff with documented resolution notes | `CLOSED`, `IN_PROGRESS` | Closed when verified; can be reopened to `IN_PROGRESS` if issue recurs. |
+| `CLOSED` | Formally verified and closed; terminal state | *(None)* | Cannot transition to any other status. |
+| `REJECTED` | Marked as invalid, duplicate, or unserviceable | `OPEN` | Can be reopened through authorized administrative reconsideration, subject to implemented transition rules. |
 
-### Phase 7 Migration Script (`database/migration_phase7.sql`)
-Executed to align column naming and establish complaint assignments:
-```sql
--- 1. Standardize resolution notes column
-ALTER TABLE resolutions CHANGE COLUMN remarks resolution_notes TEXT NOT NULL;
+### Status Transition Rules
 
--- 2. Add staff assignment tracking columns and foreign keys
-ALTER TABLE complaints ADD COLUMN assigned_admin_id INT NULL AFTER updated_at;
-ALTER TABLE complaints ADD COLUMN assigned_at TIMESTAMP NULL AFTER assigned_admin_id;
-ALTER TABLE complaints ADD CONSTRAINT fk_complaints_assigned_admin 
-    FOREIGN KEY (assigned_admin_id) REFERENCES admins(admin_id) ON DELETE SET NULL;
-CREATE INDEX idx_complaints_assigned_admin ON complaints(assigned_admin_id);
+- **No-Op Prevention**: Updating a complaint to its existing status (e.g., `OPEN → OPEN` or `IN_PROGRESS → IN_PROGRESS`) is rejected before database execution with an `IllegalArgumentException("Complaint is already in status <STATUS>.")`.
+- **Forbidden Transitions**: Direct jumps that bypass investigation (`OPEN → CLOSED`), modifying closed tickets (`CLOSED → IN_PROGRESS`), and resolving rejected tickets directly (`REJECTED → RESOLVED`) are strictly blocked.
+- **Staff Assignment Separation**: Staff assignment is tracked independently from status transitions. Assigning or unassigning staff updates ticket assignment metadata without changing complaint status or creating false status transitions.
+
+---
+
+## Project Structure
+
+```text
+Complaint-Registration-and-Tracking-System/
+├── database/                      # SQL schema and migration scripts
+├── src/
+│   ├── main/
+│   │   ├── java/com/complainttracking/
+│   │   │   ├── Main.java          # JavaFX application entry point
+│   │   │   ├── controller/        # JavaFX FXML controller event handlers
+│   │   │   ├── dao/               # Data Access Objects (JDBC PreparedStatement operations)
+│   │   │   ├── database/          # Database connection singleton manager
+│   │   │   ├── model/             # Domain entities and data models
+│   │   │   ├── service/           # Business logic, state validation, and authorization
+│   │   │   └── util/              # Session management and navigation helpers
+│   │   └── resources/
+│   │       ├── css/styles.css     # JavaFX enterprise stylesheet
+│   │       └── fxml/              # FXML UI layout definitions
+│   └── test/java/com/complainttracking/service/ # Automated unit tests
+├── pom.xml                        # Maven project descriptor and dependencies
+├── .gitignore                     # Git ignore rules for build and environment artifacts
+└── README.md                      # Project documentation
 ```
 
-### Phase 8 Migration Script (`database/migration_phase8.sql`)
-Executed to establish in-app user notifications:
-```sql
-CREATE TABLE IF NOT EXISTS notifications (
-    notification_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    complaint_id INT NOT NULL,
-    title VARCHAR(100) NOT NULL,
-    message TEXT NOT NULL,
-    is_read BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_notifications_complaint FOREIGN KEY (complaint_id) REFERENCES complaints(complaint_id) ON DELETE CASCADE,
-    INDEX idx_notifications_user_read (user_id, is_read),
-    INDEX idx_notifications_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+### Main Package Responsibilities
+
+- `controller/`: Interacts with FXML controls, manages UI state, handles user events, and renders dialogs.
+- `dao/`: Executes SQL queries and updates using JDBC `PreparedStatement` within transactional boundaries.
+- `database/`: Manages singleton connection lifecycle and resolves environment credentials.
+- `model/`: Encapsulates plain Java objects mapping database records and analytical projections.
+- `service/`: Enforces business logic, input validation, role-based authorization, and status lifecycle state transitions.
+- `util/`: Manages authenticated sessions (`SessionManager`) and stage scene transitions (`NavigationHelper`).
+
+---
+
+## Database Configuration
+
+The application operates on a MySQL database named `complaint_tracking_db`.
+
+### 1. Database Scripts Purpose & Execution Order
+
+Execute the SQL scripts located in the `database/` folder in the following order:
+
+1. **`database/schema.sql`**: Base database initialization script. Automatically creates the `complaint_tracking_db` database if it does not exist, sets `utf8mb4` encoding, creates initial tables (`users`, `admins`, `complaints`, `resolutions`, `complaint_history`), adds indexes, and provisions an initial administrator account.
+2. **`database/migration_phase7.sql`**: Schema migration script. Adds staff assignment columns (`assigned_admin_id`, `assigned_at`) and foreign keys to `complaints`, and standardizes resolution columns.
+3. **`database/migration_phase8.sql`**: Schema migration script. Creates the `notifications` table with foreign key constraints and indexes for in-app user notifications.
+
+### 2. Execution Commands (Windows PowerShell)
+
+Run each script sequentially using the MySQL client:
+
+```powershell
+# Step 1: Base schema and tables
+mysql -u root -p -e "source database/schema.sql;"
+
+# Step 2: Staff assignment & resolution migrations
+mysql -u root -p -e "source database/migration_phase7.sql;"
+
+# Step 3: In-app notification migrations
+mysql -u root -p -e "source database/migration_phase8.sql;"
 ```
 
----
-
-## Phase 8: User Tracking & In-App Notifications
-
-### 1. Quick Complaint Tracking Lookup
-- **Public / Unauthenticated Lookup (Welcome Screen):**
-  - Accessible directly from the Welcome Screen via the **Track Status** card.
-  - Users enter their tracking code (e.g. `CMP-2026-5414`).
-  - Displays complaint code, title, category, priority, status, created/updated timestamps, and public status history timeline.
-  - **Privacy Enforcement:** Complainant personal details (full name, email, department, phone) and internal sensitive notes are stripped and protected from unauthorized harvesting.
-- **Authenticated Lookup (User Dashboard):**
-  - Accessible via the **Track by ID** navigation button in the User Portal sidebar.
-  - Users enter any tracking code.
-  - **Strict Ownership Enforcement:** The system checks `complaint.getUserId() == currentUser.getUserId()`. If a user attempts to access another person's complaint, an access denied security warning is displayed.
-
-### 2. In-App Notification Center
-- **Sidebar Badge:** Dynamic unread count indicator (e.g., `🔔 Notifications (3)`) in the User Portal sidebar, automatically refreshed on launch, after actions, and when new actions occur.
-- **Notification View:**
-  - Distinct visual styling for unread (`notification-card-unread` with blue accent and `NEW` pill) vs read (`notification-card-read`) notifications.
-  - Shows notification title, timestamp, contextual message with tracking ID, and quick actions.
-  - **Mark as Read:** Single-click per-notification status update.
-  - **Mark All as Read:** Global one-click clear button for all user notifications.
-  - **View Complaint Navigation:** Automatically navigates to **My Complaints**, highlights the corresponding complaint in the table, and displays its detailed history and resolution dialog.
-
-### 3. Transactional Notification Generation
-- Automatic notifications are generated for administrator actions within the **exact same JDBC Connection and Transaction (`conn.setAutoCommit(false)`)**:
-  - **Status Update:** "Your complaint {code} status has changed from {oldStatus} to {newStatus}."
-  - **Staff Assignment:** "Your complaint {code} has been assigned to staff for investigation."
-  - **Resolution:** "Your complaint {code} has been successfully resolved."
-- **Rollback Safety:** If notification insertion fails or throws an `SQLException`, the parent complaint transaction rolls back completely, ensuring strict consistency.
-- **Duplicate Prevention:** Resolution triggers only the "Complaint Resolved" notification without emitting redundant status update notifications.
-
----
-
-## Phase 9: Administrative Analytical Reports & Dashboard Charts
-
-Phase 9 integrates comprehensive executive analytics, interactive JavaFX charts, date-range filtering, department breakdowns, staff performance rankings, and formatted CSV export into the Administrator Portal.
-
-### 1. Executive KPI Metrics
-- **Total Complaints:** Total registered volume within the active date scope.
-- **Resolution Rate (%):**
-  $$\text{Resolution Rate} = \left(\frac{\text{Resolved Complaints}}{\text{Total Complaints}}\right) \times 100$$
-  *(Safe calculation prevents division by zero when total complaints is 0).*
-- **Resolved Complaints:** Total complaints marked as `RESOLVED` (distinct from `CLOSED`).
-- **Pending Complaints:** Cumulative count of active complaints (`OPEN` + `IN_PROGRESS`).
-- **Average Resolution Time (hours):** Average duration from complaint creation (`created_at`) to formal resolution (`resolved_at`) for resolved complaints.
-
-### 2. Interactive JavaFX Charts
-- **Category-Wise Distribution (`PieChart`):** Proportional distribution of complaints across categories (Hardware, Software, Network, Facility, etc.) with category labels and exact volume counts.
-- **Complaints by Status (`BarChart<String, Number>`):** Frequency comparison across all five supported system statuses (`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `REJECTED`).
-- **Department-Wise Statistics (`BarChart<String, Number>`):** Identifies organizational departments with the highest volume of submitted complaints.
-- **Monthly Registration Trends (`LineChart<String, Number>`):** Chronological trend visualization formatted as `YYYY-MM` to monitor issue patterns over time.
-
-### 3. Date-Range Filtering
-- **Start Date & End Date DatePickers:** Integrated into the Reports toolbar for dynamic time-scoped analysis.
-- **Boundary Handling:**
-  - If neither date is chosen, full historical data is processed.
-  - If start date only is chosen, all complaints from `startDate 00:00:00` onward are included.
-  - If end date only is chosen, all complaints through `endDate 23:59:59` are included.
-  - Full date-range captures all activity between start and end dates inclusively.
-  - Rejects invalid configurations where `startDate > endDate` with an informative warning.
-- **Reset Button:** Instantly clears date inputs and restores all-time metrics.
-
-### 4. Staff Performance Analytics
-A dedicated JavaFX `TableView<StaffPerformance>` evaluates staff efficiency and resolution throughput:
-- **Staff Name & Role:** Full administrator name and assigned role (`ADMIN`, `STAFF`, `SUPERADMIN`).
-- **Assigned Volume:** Total distinct complaints assigned via `complaints.assigned_admin_id`.
-- **Resolved Volume:** Total assigned complaints brought to `RESOLVED` or `CLOSED` state.
-- **Resolution Rate (%):** Percentage of assigned complaints successfully resolved.
-- **Average Resolution Time (hrs):** Average turnaround time in hours computed per staff member.
-
-### 5. CSV Report Export
-- **One-Click Export:** The **Export CSV** toolbar button opens a native JavaFX `FileChooser` dialog defaulting to `CRTS_Analytical_Report_YYYY-MM-DD.csv`.
-- **Formatted Report Structure:**
-  1. Title and generation timestamp.
-  2. Active reporting period description.
-  3. Executive KPI summary table.
-  4. Status distribution breakdown.
-  5. Category distribution table.
-  6. Chronological monthly trend summary.
-  7. Department breakdown table.
-  8. Staff performance metrics table.
-- **Compliance & Security:**
-  - Includes UTF-8 Byte Order Mark (`\ufeff`) for direct Excel compatibility.
-  - Full RFC 4180 CSV escaping for commas, double quotes, and multi-line strings.
-  - Does NOT export password hashes, credentials, or sensitive authentication details.
-
-### 6. Security & Authorization
-- Access to analytical reports and export APIs is restricted strictly to active administrator sessions (`SessionManager.getInstance().isAdminLoggedIn()`).
-- Normal user sessions and unauthenticated requests attempting to access analytical reporting throw a `SecurityException`.
-- Analytical database queries run sequentially off the JavaFX Application Thread inside a dedicated background worker (`report-loading-thread`) with safe UI updates via `Platform.runLater()`.
-
----
-
-## Status Transition Lifecycle & Business Rules
-
-All status changes are strictly controlled through `ResolutionService.isValidStatusTransition(...)` and committed inside single JDBC transactions (`conn.setAutoCommit(false)`):
-
-| Current Status | Allowed Next Status | Trigger / Description |
-|----------------|---------------------|-----------------------|
-| `OPEN`         | `IN_PROGRESS`       | Admin assigns staff or begins investigation. |
-| `OPEN`         | `REJECTED`          | Invalid, spam, or duplicate request (requires remarks). |
-| `IN_PROGRESS`  | `RESOLVED`          | Root cause resolved (requires resolution notes ≥ 10 chars). |
-| `IN_PROGRESS`  | `REJECTED`          | Cannot be serviced after initial investigation. |
-| `IN_PROGRESS`  | `OPEN`              | Re-queued to open pool. |
-| `RESOLVED`     | `CLOSED`            | Confirmed resolved and formally closed. |
-| `RESOLVED`     | `IN_PROGRESS`       | Reopened by admin upon user feedback or recurring defect. |
-| `REJECTED`     | `OPEN`              | Reconsidered by admin upon user appeal. |
-| `CLOSED`       | *(None)*            | Terminal status; no transitions allowed. |
-
-### Forbidden Transitions
-- `OPEN` ➔ `CLOSED` (Cannot bypass investigation and resolution)
-- `CLOSED` ➔ `IN_PROGRESS` (Closed tickets cannot be modified directly)
-- `REJECTED` ➔ `RESOLVED` (Must be reconsidered to `OPEN` first)
-- Transitioning to the exact same status
-
----
-
-## Assignment & Resolution Workflow
-
-### Staff Assignment
-- Administrators can assign any open or in-progress complaint to an available administrator/staff member via the **Assign Staff** button in the Admin Dashboard.
-- Optional handoff instructions or notes are recorded directly into `complaint_history`.
-- Unassigning (`assigned_admin_id = NULL`) is fully supported.
-
-### Resolution Management
-- When resolving a complaint, the administrator provides detailed resolution notes (minimum 10 characters).
-- The operation runs in a single transaction:
-  1. Inserts into `resolutions (complaint_id, admin_id, resolution_notes, resolved_at)`.
-  2. Updates `complaints (status = 'RESOLVED', updated_at = NOW())`.
-  3. Inserts into `complaint_history` recording the transition with the resolving admin's name.
-- Both the Admin inspection dialog and User details dialog display a prominent **Resolution Information** card highlighting the notes, resolving admin, and resolution timestamp.
-
----
-
-## Initial Administrator Account
-
-- **Username:** `admin`
-- **Default Password:** `Admin@123`
-- **Role:** `superadmin`
-
-BCrypt hash seeded in MySQL for `Admin@123`:
-```
-$2a$12$yGaascJlePP97TzEbfS7beejCGhBYdcBeRPBnPGwjEfue/j6R7zle
+*Note: Alternatively, you can use PowerShell redirection:*
+```powershell
+Get-Content .\database\schema.sql | mysql -u root -p
+Get-Content .\database\migration_phase7.sql | mysql -u root -p
+Get-Content .\database\migration_phase8.sql | mysql -u root -p
 ```
 
----
+### 3. Verify Database Setup
 
-## Environment Variables (Database Credentials)
+Verify that all six expected tables exist in `complaint_tracking_db`:
 
-Set the following environment variables before launching:
+```powershell
+mysql -u root -p -e "USE complaint_tracking_db; SHOW TABLES;"
+```
 
-| Variable  | Description                        | Example |
-|-----------|------------------------------------|---------|
-| `DB_URL`  | Full JDBC connection string        | `jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true` |
-| `DB_USER` | MySQL username                     | `root` |
-| `DB_PASS` | MySQL password                     | `your_password` |
+Expected output tables:
+- `admins`
+- `complaint_history`
+- `complaints`
+- `notifications`
+- `resolutions`
+- `users`
 
-**PowerShell Example:**
+### 4. Initial Administrator Provisioning
+
+An initial administrator account is provisioned during database setup. Change the default credentials before using the application in a production environment.
+
+### 5. Secure Credential Configuration
+
+`DatabaseConnection.java` retrieves credentials from environment variables at runtime. Set these variables in your terminal session before launching the application:
+
+| Variable | Description | Default Fallback |
+| :--- | :--- | :--- |
+| `DB_URL` | JDBC database URL | `jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true` |
+| `DB_USER` | MySQL user | `root` |
+| `DB_PASS` | MySQL password | `""` *(empty)* |
+
+Configure environment variables in PowerShell as follows:
+
 ```powershell
 $env:DB_USER = "root"
-$env:DB_PASS = "r15k3P@5"
+$env:DB_PASS = "<your_mysql_password>"
 $env:DB_URL  = "jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
 ```
 
 ---
 
-## Building, Testing, and Running
+## Installation and Setup
 
-### Run Automated Unit Tests (116 tests)
-```powershell
-mvn test
-```
+### Setup Instructions (Windows PowerShell)
 
-### Clean & Compile
-```powershell
-mvn clean compile
-```
+1. **Clone the repository**:
+   ```powershell
+   git clone https://github.com/Rerishabh/Complaint-Registration-and-Tracking-System.git
+   cd Complaint-Registration-and-Tracking-System
+   ```
 
-### Launch the Application
-```powershell
-mvn javafx:run
-```
+2. **Initialize the MySQL database**:
+   Follow the step-by-step instructions in the [Database Configuration](#database-configuration) section to execute the database scripts in order (`schema.sql`, `migration_phase7.sql`, and `migration_phase8.sql`) and verify that all 6 tables are created.
 
----
+3. **Configure database environment variables**:
+   ```powershell
+   $env:DB_USER = "root"
+   $env:DB_PASS = "<your_mysql_password>"
+   $env:DB_URL  = "jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
+   ```
 
-## Manual Verification & SQL Queries
+4. **Compile the application**:
+   ```powershell
+   mvn clean compile
+   ```
 
-To verify operations directly in MySQL Workbench:
-
-```sql
-USE complaint_tracking_db;
-
--- 1. Inspect recent status transitions and assignment logs
-SELECT h.history_id, c.tracking_code, h.old_status, h.new_status, h.changed_by, h.note, h.changed_at
-FROM complaint_history h
-JOIN complaints c ON h.complaint_id = c.complaint_id
-ORDER BY h.changed_at DESC
-LIMIT 10;
-
--- 2. Inspect recorded resolutions
-SELECT r.resolution_id, c.tracking_code, a.full_name AS resolver_name, r.resolution_notes, r.resolved_at
-FROM resolutions r
-JOIN complaints c ON r.complaint_id = c.complaint_id
-JOIN admins a ON r.admin_id = a.admin_id
-ORDER BY r.resolved_at DESC;
-
--- 3. Check complaint assignments
-SELECT c.tracking_code, c.title, c.status, a.full_name AS assigned_to, c.assigned_at
-FROM complaints c
-LEFT JOIN admins a ON c.assigned_admin_id = a.admin_id
-ORDER BY c.created_at DESC;
-```
+5. **Launch the JavaFX application**:
+   ```powershell
+   mvn javafx:run
+   ```
 
 ---
 
-## Academic Marking Criteria Alignment
+## Automated Testing
 
-> **Category:** "Project with Event Handling, JavaFX and JDBC with MySQL" (Maximum Marks: 15)
+### Latest Test Execution Summary
 
-Key implementations verified:
-- **JavaFX Event Handling:** Action events, modal dialogs, background threads off the JavaFX Application Thread with `Platform.runLater()`.
-- **JavaFX & FXML:** Modular FXML views, dynamic table columns (`Assigned Staff`), responsive layouts, and unified CSS styling.
-- **JDBC & MySQL:** Parameterized `PreparedStatement` queries, multi-statement transactional updates (`conn.setAutoCommit(false)`), rollback handling, and foreign key referential integrity.
-- **Core Java & Architecture:** Clean MVC architecture, BCrypt password hashing, session singleton, thorough unit testing with in-memory test stubs.
+The test suite was executed using `mvn clean test` with the following verified results:
+
+| Metric | Result |
+| :--- | :--- |
+| **Total Tests** | 119 |
+| **Passed** | 119 |
+| **Failed** | 0 |
+| **Errors** | 0 |
+| **Skipped** | 0 |
+
+### Running the Test Suite
+
+```powershell
+mvn clean test
+```
+
+### Test Classes Overview
+
+| Test Class | Focus Areas |
+| :--- | :--- |
+| `AuthenticationServiceTest` | User registration, credential validation, BCrypt verification, duplicate email checks |
+| `ComplaintServiceTest` | Complaint validation, priority mapping, tracking code generation, ownership rules |
+| `AdminComplaintServiceTest` | Dashboard statistics, multi-criteria filtering, search matching, authorization checks |
+| `ResolutionServiceTest` | Status transition rules, no-op prevention (`OPEN → OPEN`), assignment history preservation, resolution validation |
+| `NotificationServiceTest` | Unread badge counts, mark-as-read updates, user ownership checks |
+| `ReportServiceTest` | Date range boundary checks, KPI calculations, CSV export formatting, administrator authorization |
+
+> [!NOTE]
+> Automated unit tests utilize in-memory DAO stubs (`StubComplaintDAO`, `StubHistoryDAO`, `StubResolutionDAO`, `StubAdminDAO`) to verify business logic, state transitions, validation boundaries, and authorization rules in isolation. These unit tests do not replace end-to-end integration testing against a live MySQL database.
+
+---
+
+## Security Practices
+
+- **Salted Password Hashing**: Passwords for users and administrators are hashed using BCrypt (cost factor 12) before persistence. Plaintext passwords are never stored.
+- **SQL Injection Prevention**: All database queries and updates in `dao` classes utilize JDBC `PreparedStatement` with parameterized placeholders.
+- **Transaction Atomicity**: Critical operations (such as status updates, staff assignments, and resolutions) run within explicit JDBC transactions (`conn.setAutoCommit(false)`) with automatic rollback (`conn.rollback()`) on failure.
+- **Session Enforcement**: `SessionManager` maintains logged-in state in memory. Service methods enforce authorization via `requireAdminSession()` and session validation.
+- **Data Privacy**: Public tracking lookups exclude complainant identities (name, email, phone) and internal administrative notes, displaying only complaint identifiers and status history.
+- **Safe CSV Handling**: CSV export in `ReportService` implements RFC 4180 escaping and does not export password hashes or authentication secrets.
+
+---
+
+## Future Enhancements
+
+The following features represent planned future enhancements:
+
+- **Email & SMS Notifications**: External SMTP or SMS gateway integration for real-time delivery outside the desktop client.
+- **File & Media Attachments**: Support for attaching photos, error logs, and documentation to complaints.
+- **PDF Export**: Direct generation of formatted PDF analytical reports alongside CSV.
+- **Theme Customization**: User-selectable visual themes (Dark Mode and Light Mode).
+- **Internationalization (i18n)**: Multi-language resource bundles for UI localization.
+
+---
+
+## Author
+
+- **Rishabh Paira**
+- **GitHub**: [https://github.com/Rerishabh](https://github.com/Rerishabh)
