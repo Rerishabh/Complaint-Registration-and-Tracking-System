@@ -92,7 +92,44 @@ public class ComplaintHistory {
         if (oldStatus != null && oldStatus.equalsIgnoreCase(newStatus)) {
             return true;
         }
-        return note != null && (note.toLowerCase().startsWith("assigned to ") || note.toLowerCase().startsWith("assignment removed"));
+        return note != null && (note.toLowerCase().contains("assigned") || note.toLowerCase().contains("assignment"));
+    }
+
+    /**
+     * Checks if this history entry represents an unassignment event (assignment removed).
+     */
+    public boolean isUnassignmentEvent() {
+        return note != null && (note.toLowerCase().contains("unassign") || note.toLowerCase().contains("removed"));
+    }
+
+    /**
+     * Computes the display header text for this history entry across dashboards and public tracking.
+     * Ensures identical old and new statuses (e.g. OPEN -> OPEN, IN_PROGRESS -> IN_PROGRESS)
+     * are never displayed as a status transition, but as "Staff Assigned" or "Assignment Removed".
+     * Genuine status transitions (e.g. OPEN -> IN_PROGRESS, IN_PROGRESS -> RESOLVED) are preserved.
+     *
+     * @param initialPrefix prefix to use when oldStatus is null (e.g. "—" or "SUBMITTED")
+     * @return formatted display header string
+     */
+    public String getDisplayHeaderText(String initialPrefix) {
+        if (oldStatus == null) {
+            String prefix = (initialPrefix != null && !initialPrefix.trim().isEmpty()) ? initialPrefix.trim() : "—";
+            return prefix + "  →  " + (newStatus != null ? newStatus : "");
+        }
+        if (oldStatus.equalsIgnoreCase(newStatus)) {
+            if (isUnassignmentEvent()) {
+                return "Assignment Removed";
+            }
+            return "Staff Assigned";
+        }
+        return oldStatus + "  →  " + newStatus;
+    }
+
+    /**
+     * Default display header using "—" for initial status transition.
+     */
+    public String getDisplayHeaderText() {
+        return getDisplayHeaderText("—");
     }
 
     @Override

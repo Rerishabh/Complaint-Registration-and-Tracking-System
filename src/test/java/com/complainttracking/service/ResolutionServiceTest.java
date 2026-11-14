@@ -780,21 +780,46 @@ class ResolutionServiceTest {
             ComplaintHistory initial = new ComplaintHistory(1, 101, null, "OPEN", "User", "Submitted", new Timestamp(System.currentTimeMillis()));
             assertTrue(initial.isStatusTransition(), "Initial submission is a status transition");
             assertFalse(initial.isAssignmentEvent(), "Initial submission is not an assignment event");
+            assertEquals("—  →  OPEN", initial.getDisplayHeaderText("—"));
+            assertEquals("SUBMITTED  →  OPEN", initial.getDisplayHeaderText("SUBMITTED"));
 
             // Genuine transition (OPEN -> IN_PROGRESS)
             ComplaintHistory transition = new ComplaintHistory(2, 101, "OPEN", "IN_PROGRESS", "Admin", "Investigation started", new Timestamp(System.currentTimeMillis()));
             assertTrue(transition.isStatusTransition(), "OPEN -> IN_PROGRESS is a genuine status transition");
             assertFalse(transition.isAssignmentEvent(), "Status update is not an assignment event");
+            assertEquals("OPEN  →  IN_PROGRESS", transition.getDisplayHeaderText("—"));
+            assertEquals("OPEN  →  IN_PROGRESS", transition.getDisplayHeaderText("SUBMITTED"));
+
+            // Genuine transition with remarks mentioning "assigned" (e.g. CMP-2026-9724 entry 3)
+            ComplaintHistory transitionWithAssignRemark = new ComplaintHistory(3, 101, "OPEN", "IN_PROGRESS", "Admin",
+                    "Complaint assigned to the administrator. Initial inspection and troubleshooting are in progress.",
+                    new Timestamp(System.currentTimeMillis()));
+            assertTrue(transitionWithAssignRemark.isStatusTransition());
+            assertEquals("OPEN  →  IN_PROGRESS", transitionWithAssignRemark.getDisplayHeaderText("—"),
+                    "Genuine status transition must not be disguised as an assignment event even if remarks mention assign");
 
             // Assignment event (OPEN -> OPEN with note Assigned to...)
-            ComplaintHistory assignment = new ComplaintHistory(3, 101, "OPEN", "OPEN", "Admin", "Assigned to Bob Officer – Check cable", new Timestamp(System.currentTimeMillis()));
+            ComplaintHistory assignment = new ComplaintHistory(4, 101, "OPEN", "OPEN", "Admin", "Assigned to System Administrator.", new Timestamp(System.currentTimeMillis()));
             assertFalse(assignment.isStatusTransition(), "Assignment with identical status is not a status transition");
             assertTrue(assignment.isAssignmentEvent(), "Assignment note and identical status is an assignment event");
+            assertEquals("Staff Assigned", assignment.getDisplayHeaderText("—"));
+            assertEquals("Staff Assigned", assignment.getDisplayHeaderText("SUBMITTED"));
+            assertNotEquals("OPEN  →  OPEN", assignment.getDisplayHeaderText("—"));
+
+            // Assignment event in IN_PROGRESS (IN_PROGRESS -> IN_PROGRESS)
+            ComplaintHistory inProgressAssignment = new ComplaintHistory(5, 101, "IN_PROGRESS", "IN_PROGRESS", "Admin", "Assigned to Bob Officer", new Timestamp(System.currentTimeMillis()));
+            assertFalse(inProgressAssignment.isStatusTransition());
+            assertTrue(inProgressAssignment.isAssignmentEvent());
+            assertEquals("Staff Assigned", inProgressAssignment.getDisplayHeaderText("—"));
+            assertNotEquals("IN_PROGRESS  →  IN_PROGRESS", inProgressAssignment.getDisplayHeaderText("—"));
 
             // Unassignment event (IN_PROGRESS -> IN_PROGRESS with note Assignment removed)
-            ComplaintHistory unassignment = new ComplaintHistory(4, 101, "IN_PROGRESS", "IN_PROGRESS", "Admin", "Assignment removed", new Timestamp(System.currentTimeMillis()));
+            ComplaintHistory unassignment = new ComplaintHistory(6, 101, "IN_PROGRESS", "IN_PROGRESS", "Admin", "Assignment removed", new Timestamp(System.currentTimeMillis()));
             assertFalse(unassignment.isStatusTransition(), "Unassignment with identical status is not a status transition");
             assertTrue(unassignment.isAssignmentEvent(), "Assignment removed is an assignment event");
+            assertTrue(unassignment.isUnassignmentEvent());
+            assertEquals("Assignment Removed", unassignment.getDisplayHeaderText("—"));
+            assertEquals("Assignment Removed", unassignment.getDisplayHeaderText("SUBMITTED"));
         }
     }
 }

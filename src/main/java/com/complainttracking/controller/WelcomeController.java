@@ -315,21 +315,7 @@ public class WelcomeController implements Initializable {
         } else {
             for (ComplaintHistory h : history) {
                 VBox item = new VBox(3);
-                String headerText;
-                if (h.getOldStatus() == null) {
-                    headerText = "SUBMITTED  \u2192  " + h.getNewStatus();
-                } else if (h.isAssignmentEvent()) {
-                    if (h.getNote() != null && h.getNote().toLowerCase().contains("removed")) {
-                        headerText = "Assignment Removed";
-                    } else {
-                        headerText = "Staff Assigned";
-                    }
-                } else if (h.getOldStatus().equalsIgnoreCase(h.getNewStatus())) {
-                    headerText = "Status: " + h.getNewStatus();
-                } else {
-                    headerText = h.getOldStatus() + "  \u2192  " + h.getNewStatus();
-                }
-
+                String headerText = h.getDisplayHeaderText("SUBMITTED");
                 Label statusLine = new Label(headerText);
                 statusLine.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #1D4ED8;");
 
