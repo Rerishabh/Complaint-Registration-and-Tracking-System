@@ -5,6 +5,8 @@ import com.complainttracking.dao.ComplaintHistoryDAO;
 import com.complainttracking.database.DatabaseConnection;
 import com.complainttracking.model.Complaint;
 import com.complainttracking.model.ComplaintHistory;
+import com.complainttracking.util.NavigationHelper;
+import com.complainttracking.util.SessionManager;
 import javafx.animation.FadeTransition;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -46,6 +48,13 @@ public class WelcomeController implements Initializable {
     @FXML private Button adminLoginButton;
     @FXML private Button trackComplaintButton;
 
+    // Sidebar navigation buttons and main scrollpane
+    @FXML private ScrollPane welcomeScrollPane;
+    @FXML private Button navHomeBtn;
+    @FXML private Button navComplaintsBtn;
+    @FXML private Button navAccountBtn;
+    @FXML private Button navReportsBtn;
+
     private static final SimpleDateFormat DATE_FMT = new SimpleDateFormat("dd MMM yyyy, hh:mm a");
 
     // ---------------------------------------------------------------
@@ -53,8 +62,115 @@ public class WelcomeController implements Initializable {
     // ---------------------------------------------------------------
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        playFadeIn(titleLabel, 800);
-        playFadeIn(subtitleLabel, 1200);
+        if (titleLabel != null) {
+            titleLabel.setOpacity(1.0);
+            titleLabel.setVisible(true);
+            titleLabel.setManaged(true);
+        }
+        if (subtitleLabel != null) {
+            subtitleLabel.setOpacity(1.0);
+            subtitleLabel.setVisible(true);
+            subtitleLabel.setManaged(true);
+        }
+        checkInitialDatabaseConnection();
+    }
+
+    // ---------------------------------------------------------------
+    // Sidebar Navigation Event Handlers
+    // ---------------------------------------------------------------
+
+    /**
+     * Handles the "Home" navigation button click.
+     * Displays the Welcome Screen overview and scrolls to top.
+     */
+    @FXML
+    private void handleNavHome(ActionEvent event) {
+        if (welcomeScrollPane != null) {
+            welcomeScrollPane.setVvalue(0.0);
+        }
+        if (titleLabel != null) {
+            titleLabel.setOpacity(1.0);
+            titleLabel.setVisible(true);
+        }
+        if (subtitleLabel != null) {
+            subtitleLabel.setOpacity(1.0);
+            subtitleLabel.setVisible(true);
+        }
+        setActiveNav(navHomeBtn);
+    }
+
+    /**
+     * Handles the "Complaints" navigation button click.
+     * Navigates to User Login screen, or active dashboard if authenticated.
+     */
+    @FXML
+    private void handleNavComplaints(ActionEvent event) {
+        if (SessionManager.getInstance().isUserLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/UserDashboard.fxml", "User Dashboard - CRTS");
+        } else if (SessionManager.getInstance().isAdminLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/AdminDashboard.fxml", "Admin Dashboard - CRTS");
+        } else {
+            NavigationHelper.navigate(event, "/fxml/UserLogin.fxml", "User Login - CRTS");
+        }
+    }
+
+    /**
+     * Handles the "My Account" navigation button click.
+     * Navigates to User Login screen, or active dashboard if authenticated.
+     */
+    @FXML
+    private void handleNavAccount(ActionEvent event) {
+        if (SessionManager.getInstance().isUserLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/UserDashboard.fxml", "User Dashboard - CRTS");
+        } else if (SessionManager.getInstance().isAdminLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/AdminDashboard.fxml", "Admin Dashboard - CRTS");
+        } else {
+            NavigationHelper.navigate(event, "/fxml/UserLogin.fxml", "User Login - CRTS");
+        }
+    }
+
+    /**
+     * Handles the "Reports" navigation button click.
+     * Navigates to Admin Login screen, or Admin Dashboard if authenticated.
+     */
+    @FXML
+    private void handleNavReports(ActionEvent event) {
+        if (SessionManager.getInstance().isAdminLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/AdminDashboard.fxml", "Admin Dashboard - CRTS");
+        } else {
+            NavigationHelper.navigate(event, "/fxml/AdminLogin.fxml", "Admin Login - CRTS");
+        }
+    }
+
+    private void setActiveNav(Button activeBtn) {
+        Button[] navButtons = {navHomeBtn, navComplaintsBtn, navAccountBtn, navReportsBtn};
+        for (Button btn : navButtons) {
+            if (btn != null) {
+                btn.getStyleClass().remove("nav-btn-active");
+            }
+        }
+        if (activeBtn != null && !activeBtn.getStyleClass().contains("nav-btn-active")) {
+            activeBtn.getStyleClass().add("nav-btn-active");
+        }
+    }
+
+    private void checkInitialDatabaseConnection() {
+        Thread dbThread = new Thread(() -> {
+            boolean connected = DatabaseConnection.testConnection();
+            javafx.application.Platform.runLater(() -> {
+                if (statusLabel != null) {
+                    statusLabel.getStyleClass().removeAll("status-checking", "status-ok", "status-error");
+                    if (connected) {
+                        statusLabel.setText("\u2714  Database connected successfully.");
+                        statusLabel.getStyleClass().add("status-ok");
+                    } else {
+                        statusLabel.setText("Database not connected. Click below to verify.");
+                    }
+                }
+            });
+        }, "initial-db-check");
+        dbThread.setDaemon(true);
+        dbThread.start();
     }
 
     // ---------------------------------------------------------------
@@ -100,23 +216,29 @@ public class WelcomeController implements Initializable {
     }
 
     /**
-     * Handles the "User Login" button click – navigates to User Login view.
+     * Handles the "User Login" button click – navigates to User Login view,
+     * or User Dashboard if already logged in.
      */
     @FXML
     private void handleUserLogin(ActionEvent event) {
-        com.complainttracking.util.NavigationHelper.navigate(
-                event, "/fxml/UserLogin.fxml", "User Login - CRTS"
-        );
+        if (SessionManager.getInstance().isUserLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/UserDashboard.fxml", "User Dashboard - CRTS");
+        } else {
+            NavigationHelper.navigate(event, "/fxml/UserLogin.fxml", "User Login - CRTS");
+        }
     }
 
     /**
-     * Handles the "Admin Login" button click – navigates to Admin Login view.
+     * Handles the "Admin Login" button click – navigates to Admin Login view,
+     * or Admin Dashboard if already logged in.
      */
     @FXML
     private void handleAdminLogin(ActionEvent event) {
-        com.complainttracking.util.NavigationHelper.navigate(
-                event, "/fxml/AdminLogin.fxml", "Admin Login - CRTS"
-        );
+        if (SessionManager.getInstance().isAdminLoggedIn()) {
+            NavigationHelper.navigate(event, "/fxml/AdminDashboard.fxml", "Admin Dashboard - CRTS");
+        } else {
+            NavigationHelper.navigate(event, "/fxml/AdminLogin.fxml", "Admin Login - CRTS");
+        }
     }
 
     /**
@@ -232,15 +354,6 @@ public class WelcomeController implements Initializable {
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
-
-    private void playFadeIn(javafx.scene.Node node, double delayMs) {
-        node.setOpacity(0);
-        FadeTransition ft = new FadeTransition(Duration.millis(800), node);
-        ft.setFromValue(0.0);
-        ft.setToValue(1.0);
-        ft.setDelay(Duration.millis(delayMs));
-        ft.play();
-    }
 
     private void showAlert(AlertType type, String title,
                            String header, String content) {
