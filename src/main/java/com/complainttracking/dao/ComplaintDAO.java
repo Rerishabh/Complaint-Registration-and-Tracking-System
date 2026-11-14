@@ -2,6 +2,7 @@ package com.complainttracking.dao;
 
 import com.complainttracking.database.DatabaseConnection;
 import com.complainttracking.model.Complaint;
+import com.complainttracking.model.Notification;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -157,6 +158,13 @@ public class ComplaintDAO {
                 psHistory.executeUpdate();
             }
 
+            // Phase 8: Insert notification within the same transaction
+            String notifMsg = "Your complaint {code} status has changed from " + oldStatus + " to " + newStatus + ".";
+            if (remarks != null && !remarks.trim().isEmpty()) {
+                notifMsg += " Note: " + remarks.trim();
+            }
+            insertNotification(conn, complaintId, "Complaint Status Updated", notifMsg);
+
             conn.commit();
             LOGGER.log(Level.INFO, "Complaint ID {0} status updated from {1} to {2}",
                     new Object[]{complaintId, oldStatus, newStatus});
@@ -225,6 +233,21 @@ public class ComplaintDAO {
                 psHistory.setString(5, remarks);
                 psHistory.executeUpdate();
             }
+
+            // Phase 8: Insert notification within the same transaction
+            String notifTitle;
+            String notifMsg;
+            if (assignedAdminId != null) {
+                notifTitle = "Complaint Assigned";
+                notifMsg = "Your complaint {code} has been assigned to staff for investigation.";
+                if (remarks != null && !remarks.trim().isEmpty()) {
+                    notifMsg += " Note: " + remarks.trim();
+                }
+            } else {
+                notifTitle = "Complaint Unassigned";
+                notifMsg = "Your complaint {code} has been unassigned.";
+            }
+            insertNotification(conn, complaintId, notifTitle, notifMsg);
 
             conn.commit();
             LOGGER.log(Level.INFO, "Complaint ID {0} assigned to admin {1}",
@@ -300,6 +323,13 @@ public class ComplaintDAO {
                 psHistory.executeUpdate();
             }
 
+            // Phase 8: Insert notification within the same transaction (avoiding duplicate notifications)
+            String notifMsg = "Your complaint {code} has been successfully resolved.";
+            if (resolutionNotes != null && !resolutionNotes.trim().isEmpty()) {
+                notifMsg += " Resolution: " + resolutionNotes.trim();
+            }
+            insertNotification(conn, complaintId, "Complaint Resolved", notifMsg);
+
             conn.commit();
             LOGGER.log(Level.INFO, "Complaint ID {0} successfully resolved by admin ID {1}",
                     new Object[]{complaintId, adminId});
@@ -318,6 +348,39 @@ public class ComplaintDAO {
                     LOGGER.log(Level.WARNING, "Could not restore auto-commit", e);
                 }
             }
+        }
+    }
+
+    /**
+     * Helper to insert an in-app notification within an existing transaction.
+     * Throws SQLException so the parent transaction rolls back on notification failure.
+     */
+    private void insertNotification(Connection conn, int complaintId, String title, String messageTemplate) throws SQLException {
+        int userId = -1;
+        String trackingCode = null;
+        String lookupSql = "SELECT user_id, tracking_code FROM complaints WHERE complaint_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(lookupSql)) {
+            ps.setInt(1, complaintId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    userId = rs.getInt("user_id");
+                    trackingCode = rs.getString("tracking_code");
+                }
+            }
+        }
+
+        if (userId > 0) {
+            String codeStr = (trackingCode != null && !trackingCode.isEmpty()) ? trackingCode : ("#" + complaintId);
+            String message = messageTemplate.replace("{code}", codeStr);
+
+            Notification notif = new Notification();
+            notif.setUserId(userId);
+            notif.setComplaintId(complaintId);
+            notif.setTitle(title);
+            notif.setMessage(message);
+            notif.setRead(false);
+
+            new NotificationDAO().createNotification(conn, notif);
         }
     }
 
@@ -344,6 +407,32 @@ public class ComplaintDAO {
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Error finding complaint by ID: " + complaintId, e);
+        }
+        return null;
+    }
+
+    /**
+     * Finds a single complaint by tracking code with all complainant and assignment details.
+     *
+     * @param trackingCode tracking code (e.g. CMP-2026-1234)
+     * @return Complaint object or null if not found
+     */
+    public Complaint findByTrackingCode(String trackingCode) {
+        if (trackingCode == null || trackingCode.trim().isEmpty()) {
+            return null;
+        }
+        final String sql = SELECT_BASE + "WHERE c.tracking_code = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, trackingCode.trim().toUpperCase());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapComplaintFull(rs);
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Error finding complaint by tracking code: " + trackingCode, e);
         }
         return null;
     }

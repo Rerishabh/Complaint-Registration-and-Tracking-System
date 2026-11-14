@@ -1,17 +1,25 @@
 package com.complainttracking.controller;
 
+import com.complainttracking.dao.ComplaintDAO;
+import com.complainttracking.dao.ComplaintHistoryDAO;
 import com.complainttracking.database.DatabaseConnection;
+import com.complainttracking.model.Complaint;
+import com.complainttracking.model.ComplaintHistory;
 import javafx.animation.FadeTransition;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Alert;
+import javafx.geometry.Insets;
+import javafx.scene.control.*;
 import javafx.scene.control.Alert.AlertType;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.List;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,6 +44,9 @@ public class WelcomeController implements Initializable {
     @FXML private Button checkDbButton;
     @FXML private Button userLoginButton;
     @FXML private Button adminLoginButton;
+    @FXML private Button trackComplaintButton;
+
+    private static final SimpleDateFormat DATE_FMT = new SimpleDateFormat("dd MMM yyyy, hh:mm a");
 
     // ---------------------------------------------------------------
     // Initializable
@@ -106,6 +117,116 @@ public class WelcomeController implements Initializable {
         com.complainttracking.util.NavigationHelper.navigate(
                 event, "/fxml/AdminLogin.fxml", "Admin Login - CRTS"
         );
+    }
+
+    /**
+     * Handles the "Track Complaint" button click event.
+     * Prompts for tracking code and performs a public tracking lookup
+     * while protecting sensitive complainant personal details.
+     */
+    @FXML
+    private void handleTrackComplaint(ActionEvent event) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Track Complaint");
+        dialog.setHeaderText("Quick Complaint Tracking Lookup");
+        dialog.setContentText("Enter Tracking Code (e.g. CMP-2026-5414):");
+
+        Optional<String> result = dialog.showAndWait();
+        if (result.isEmpty() || result.get().trim().isEmpty()) {
+            return;
+        }
+
+        String trackingCode = result.get().trim().toUpperCase();
+        ComplaintDAO complaintDAO = new ComplaintDAO();
+        Complaint complaint = complaintDAO.findByTrackingCode(trackingCode);
+
+        if (complaint == null) {
+            showAlert(AlertType.INFORMATION, "Complaint Not Found",
+                    "No complaint matches code: " + trackingCode,
+                    "Please double-check your tracking ID and try again.");
+            return;
+        }
+
+        ComplaintHistoryDAO historyDAO = new ComplaintHistoryDAO();
+        List<ComplaintHistory> history = historyDAO.findByComplaintId(complaint.getComplaintId());
+
+        showPublicTrackingDialog(complaint, history);
+    }
+
+    /**
+     * Displays public tracking details and status history timeline.
+     * Enforces privacy: complainant email and contact info are withheld.
+     */
+    private void showPublicTrackingDialog(Complaint c, List<ComplaintHistory> history) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Tracking Status - " + c.getTrackingCode());
+        dialog.setHeaderText("Complaint Status: " + c.getStatus());
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        VBox content = new VBox(14);
+        content.setPadding(new Insets(16));
+        content.setPrefWidth(520);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(14);
+        grid.setVgap(8);
+
+        addGridRow(grid, 0, "Tracking ID", c.getTrackingCode());
+        addGridRow(grid, 1, "Title", c.getTitle());
+        addGridRow(grid, 2, "Category", c.getCategory());
+        addGridRow(grid, 3, "Priority", c.getPriority());
+        addGridRow(grid, 4, "Current Status", c.getStatus());
+        addGridRow(grid, 5, "Submitted On", c.getCreatedAt() != null ? DATE_FMT.format(c.getCreatedAt()) : "—");
+        addGridRow(grid, 6, "Last Updated", c.getUpdatedAt() != null ? DATE_FMT.format(c.getUpdatedAt()) : "—");
+
+        Label privacyNotice = new Label("Complainant details and private resolution notes are protected. Log in to User Portal for full access.");
+        privacyNotice.setWrapText(true);
+        privacyNotice.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B; -fx-font-style: italic;");
+
+        Separator sep = new Separator();
+        Label histHead = new Label("Status Timeline");
+        histHead.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #1E293B;");
+
+        VBox histItems = new VBox(8);
+        if (history == null || history.isEmpty()) {
+            histItems.getChildren().add(new Label("No timeline records available."));
+        } else {
+            for (ComplaintHistory h : history) {
+                VBox item = new VBox(3);
+                String arrow = (h.getOldStatus() == null ? "SUBMITTED" : h.getOldStatus())
+                             + "  \u2192  " + h.getNewStatus();
+                Label statusLine = new Label(arrow);
+                statusLine.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #1D4ED8;");
+
+                String meta = (h.getChangedAt() != null ? DATE_FMT.format(h.getChangedAt()) : "");
+                Label metaLine = new Label(meta);
+                metaLine.setStyle("-fx-font-size: 11px; -fx-text-fill: #64748B;");
+
+                item.getChildren().addAll(statusLine, metaLine);
+                item.setStyle("-fx-background-color: #F8FAFC; -fx-border-color: #E2E8F0; "
+                            + "-fx-border-radius: 6; -fx-background-radius: 6; -fx-padding: 8 12;");
+                histItems.getChildren().add(item);
+            }
+        }
+
+        content.getChildren().addAll(grid, privacyNotice, sep, histHead, histItems);
+
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.setMaxHeight(480);
+        scroll.setStyle("-fx-background-color: transparent;");
+
+        dialog.getDialogPane().setContent(scroll);
+        dialog.showAndWait();
+    }
+
+    private void addGridRow(GridPane g, int row, String key, String value) {
+        Label k = new Label(key);
+        k.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #64748B;");
+        Label v = new Label(value != null ? value : "—");
+        v.setStyle("-fx-font-size: 12px; -fx-text-fill: #0F172A;");
+        g.add(k, 0, row);
+        g.add(v, 1, row);
     }
 
     // ---------------------------------------------------------------

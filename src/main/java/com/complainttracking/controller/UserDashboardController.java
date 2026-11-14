@@ -1,9 +1,12 @@
 package com.complainttracking.controller;
 
+import com.complainttracking.dao.ComplaintDAO;
 import com.complainttracking.model.Complaint;
 import com.complainttracking.model.ComplaintHistory;
+import com.complainttracking.model.Notification;
 import com.complainttracking.model.User;
 import com.complainttracking.service.ComplaintService;
+import com.complainttracking.service.NotificationService;
 import com.complainttracking.util.NavigationHelper;
 import com.complainttracking.util.SessionManager;
 import javafx.application.Platform;
@@ -24,6 +27,7 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -51,11 +55,18 @@ public class UserDashboardController implements Initializable {
     @FXML private Button navOverviewBtn;
     @FXML private Button navSubmitBtn;
     @FXML private Button navMyComplaintsBtn;
+    @FXML private Button navNotificationsBtn;
+    @FXML private Button navTrackBtn;
 
     // ---- Content sections (toggled visible) ----
     @FXML private VBox overviewSection;
     @FXML private VBox submitSection;
     @FXML private VBox myComplaintsSection;
+    @FXML private VBox notificationsSection;
+
+    // ---- Notification section controls ----
+    @FXML private VBox notificationsListContainer;
+    @FXML private Button markAllReadBtn;
 
     // ---- Overview KPI labels ----
     @FXML private Label kpiTotal;
@@ -93,6 +104,7 @@ public class UserDashboardController implements Initializable {
 
     // ---- Data ----
     private final ComplaintService complaintService = new ComplaintService();
+    private final NotificationService notificationService = new NotificationService();
     private final ObservableList<Complaint> allComplaints = FXCollections.observableArrayList();
     private FilteredList<Complaint> filteredComplaints;
 
@@ -144,9 +156,46 @@ public class UserDashboardController implements Initializable {
     // Navigation Handlers
     // -----------------------------------------------------------------------
 
-    @FXML private void handleNavOverview(ActionEvent e)      { showSection(overviewSection,     navOverviewBtn);      }
+    @FXML private void handleNavOverview(ActionEvent e)      { showSection(overviewSection,      navOverviewBtn);      }
     @FXML private void handleNavSubmit(ActionEvent e)        { showSection(submitSection,        navSubmitBtn);        }
-    @FXML private void handleNavMyComplaints(ActionEvent e)  { showSection(myComplaintsSection,  navMyComplaintsBtn);  refreshData(); }
+    @FXML private void handleNavMyComplaints(ActionEvent e)  {
+        showSection(myComplaintsSection, navMyComplaintsBtn);
+        if (allComplaints.isEmpty()) {
+            refreshData();
+        } else if (!complaintsTable.getColumns().isEmpty()) {
+            complaintsTable.scrollToColumn(complaintsTable.getColumns().get(0));
+        }
+    }
+    @FXML private void handleNavNotifications(ActionEvent e) { showSection(notificationsSection, navNotificationsBtn); refreshNotifications(); }
+
+    @FXML
+    private void handleQuickTrack(ActionEvent e) {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Track Complaint");
+        dialog.setHeaderText("Quick Complaint Tracking Lookup");
+        dialog.setContentText("Enter Tracking Code (e.g. CMP-2026-5414):");
+        Optional<String> result = dialog.showAndWait();
+        if (result.isEmpty() || result.get().trim().isEmpty()) {
+            return;
+        }
+        String code = result.get().trim().toUpperCase();
+        User currentUser = SessionManager.getInstance().getCurrentUser();
+        if (currentUser == null) return;
+
+        ComplaintDAO dao = new ComplaintDAO();
+        Complaint c = dao.findByTrackingCode(code);
+        if (c == null) {
+            showAlert(Alert.AlertType.INFORMATION, "Not Found", "No complaint found with tracking code: " + code);
+            return;
+        }
+        // Enforce ownership: user can only track their own complaints inside User Portal
+        if (c.getUserId() != currentUser.getUserId()) {
+            showAlert(Alert.AlertType.WARNING, "Access Denied",
+                    "This complaint belongs to another user. In the User Portal, you can only track your own complaints.");
+            return;
+        }
+        showHistoryDialog(c);
+    }
 
     @FXML
     private void handleLogout(ActionEvent e) {
@@ -182,7 +231,7 @@ public class UserDashboardController implements Initializable {
                         "form-success-label");
                     clearSubmitForm();
                     allComplaints.add(0, c);
-                    refreshKpis();
+                    updateKpisFromComplaints();
                 });
             } catch (IllegalArgumentException | IllegalStateException ex) {
                 Platform.runLater(() -> {
@@ -226,14 +275,36 @@ public class UserDashboardController implements Initializable {
         Thread t = new Thread(() -> {
             try {
                 List<Complaint> complaints = complaintService.getMyComplaints();
-                Map<String, Integer> stats = complaintService.getMyStats();
+                int unread = notificationService.getMyUnreadCount();
+
+                // Compute KPI statistics in-memory directly from complaints.
+                // Eliminates redundant DB queries and avoids thread collisions on the JDBC connection.
+                int total = complaints.size();
+                int open = 0;
+                int inProgress = 0;
+                int resolved = 0;
+                for (Complaint c : complaints) {
+                    String status = c.getStatus();
+                    if (Complaint.STATUS_OPEN.equalsIgnoreCase(status)) {
+                        open++;
+                    } else if (Complaint.STATUS_IN_PROGRESS.equalsIgnoreCase(status)) {
+                        inProgress++;
+                    } else if (Complaint.STATUS_RESOLVED.equalsIgnoreCase(status)
+                            || Complaint.STATUS_CLOSED.equalsIgnoreCase(status)) {
+                        resolved++;
+                    }
+                }
+
+                final int fOpen = open;
+                final int fInProgress = inProgress;
+                final int fResolved = resolved;
 
                 Platform.runLater(() -> {
                     allComplaints.setAll(complaints);
-                    kpiTotal.setText(String.valueOf(stats.getOrDefault("TOTAL", 0)));
-                    kpiOpen.setText(String.valueOf(stats.getOrDefault("OPEN", 0)));
-                    kpiInProgress.setText(String.valueOf(stats.getOrDefault("IN_PROGRESS", 0)));
-                    kpiResolved.setText(String.valueOf(stats.getOrDefault("RESOLVED", 0)));
+                    kpiTotal.setText(String.valueOf(total));
+                    kpiOpen.setText(String.valueOf(fOpen));
+                    kpiInProgress.setText(String.valueOf(fInProgress));
+                    kpiResolved.setText(String.valueOf(fResolved));
 
                     // Recent = top 5
                     recentTable.setItems(FXCollections.observableArrayList(
@@ -242,9 +313,7 @@ public class UserDashboardController implements Initializable {
                     if (!recentTable.getColumns().isEmpty()) {
                         recentTable.scrollToColumn(recentTable.getColumns().get(0));
                     }
-                    if (!complaintsTable.getColumns().isEmpty()) {
-                        complaintsTable.scrollToColumn(complaintsTable.getColumns().get(0));
-                    }
+                    updateNotificationBadgeText(unread);
                 });
             } catch (Exception ex) {
                 LOGGER.log(Level.WARNING, "Error loading dashboard data", ex);
@@ -255,21 +324,32 @@ public class UserDashboardController implements Initializable {
     }
 
     private void refreshKpis() {
-        Thread t = new Thread(() -> {
-            try {
-                Map<String, Integer> stats = complaintService.getMyStats();
-                Platform.runLater(() -> {
-                    kpiTotal.setText(String.valueOf(stats.getOrDefault("TOTAL", 0)));
-                    kpiOpen.setText(String.valueOf(stats.getOrDefault("OPEN", 0)));
-                    kpiInProgress.setText(String.valueOf(stats.getOrDefault("IN_PROGRESS", 0)));
-                    kpiResolved.setText(String.valueOf(stats.getOrDefault("RESOLVED", 0)));
-                });
-            } catch (Exception ex) {
-                LOGGER.log(Level.WARNING, "Error refreshing KPIs", ex);
+        updateKpisFromComplaints();
+    }
+
+    private void updateKpisFromComplaints() {
+        int total = allComplaints.size();
+        int open = 0;
+        int inProgress = 0;
+        int resolved = 0;
+        for (Complaint c : allComplaints) {
+            String status = c.getStatus();
+            if (Complaint.STATUS_OPEN.equalsIgnoreCase(status)) {
+                open++;
+            } else if (Complaint.STATUS_IN_PROGRESS.equalsIgnoreCase(status)) {
+                inProgress++;
+            } else if (Complaint.STATUS_RESOLVED.equalsIgnoreCase(status)
+                    || Complaint.STATUS_CLOSED.equalsIgnoreCase(status)) {
+                resolved++;
             }
-        }, "kpi-refresh-thread");
-        t.setDaemon(true);
-        t.start();
+        }
+        kpiTotal.setText(String.valueOf(total));
+        kpiOpen.setText(String.valueOf(open));
+        kpiInProgress.setText(String.valueOf(inProgress));
+        kpiResolved.setText(String.valueOf(resolved));
+
+        recentTable.setItems(FXCollections.observableArrayList(
+                allComplaints.subList(0, Math.min(5, allComplaints.size()))));
     }
 
     // -----------------------------------------------------------------------
@@ -442,17 +522,200 @@ public class UserDashboardController implements Initializable {
     // -----------------------------------------------------------------------
 
     private void showSection(VBox section, Button activeNav) {
-        overviewSection.setVisible(false);     overviewSection.setManaged(false);
-        submitSection.setVisible(false);       submitSection.setManaged(false);
-        myComplaintsSection.setVisible(false); myComplaintsSection.setManaged(false);
+        overviewSection.setVisible(false);       overviewSection.setManaged(false);
+        submitSection.setVisible(false);         submitSection.setManaged(false);
+        myComplaintsSection.setVisible(false);   myComplaintsSection.setManaged(false);
+        notificationsSection.setVisible(false);  notificationsSection.setManaged(false);
 
         section.setVisible(true);
         section.setManaged(true);
 
-        for (Button b : new Button[]{navOverviewBtn, navSubmitBtn, navMyComplaintsBtn}) {
-            b.getStyleClass().removeAll("nav-btn-active");
+        for (Button b : new Button[]{navOverviewBtn, navSubmitBtn, navMyComplaintsBtn, navNotificationsBtn, navTrackBtn}) {
+            if (b != null) {
+                b.getStyleClass().removeAll("nav-btn-active");
+            }
         }
-        activeNav.getStyleClass().add("nav-btn-active");
+        if (activeNav != null) {
+            activeNav.getStyleClass().add("nav-btn-active");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Notifications Management
+    // -----------------------------------------------------------------------
+
+    @FXML
+    private void handleMarkAllNotificationsRead(ActionEvent e) {
+        Thread t = new Thread(() -> {
+            try {
+                boolean success = notificationService.markAllAsRead();
+                if (success) {
+                    List<Notification> list = notificationService.getMyNotifications();
+                    int unread = notificationService.getMyUnreadCount();
+                    Platform.runLater(() -> {
+                        renderNotificationList(list);
+                        updateNotificationBadgeText(unread);
+                    });
+                }
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "Error marking all notifications as read", ex);
+            }
+        }, "mark-all-read-thread");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    @FXML
+    private void handleRefreshNotifications(ActionEvent e) {
+        refreshNotifications();
+    }
+
+    private void updateNotificationBadgeText(int unread) {
+        if (navNotificationsBtn != null) {
+            if (unread > 0) {
+                navNotificationsBtn.setText("\uD83D\uDD14  Notifications (" + unread + ")");
+            } else {
+                navNotificationsBtn.setText("\uD83D\uDD14  Notifications");
+            }
+        }
+    }
+
+    private void refreshNotificationBadge() {
+        Thread t = new Thread(() -> {
+            try {
+                int unread = notificationService.getMyUnreadCount();
+                Platform.runLater(() -> updateNotificationBadgeText(unread));
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "Error loading unread count", ex);
+            }
+        }, "notif-count-thread");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void refreshNotifications() {
+        Thread t = new Thread(() -> {
+            try {
+                List<Notification> list = notificationService.getMyNotifications();
+                int unread = notificationService.getMyUnreadCount();
+                Platform.runLater(() -> {
+                    renderNotificationList(list);
+                    updateNotificationBadgeText(unread);
+                });
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "Error loading notifications", ex);
+            }
+        }, "notif-list-thread");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void renderNotificationList(List<Notification> list) {
+        notificationsListContainer.getChildren().clear();
+        if (list == null || list.isEmpty()) {
+            Label empty = new Label("No notifications yet.");
+            empty.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748B; -fx-padding: 20 0 0 4;");
+            notificationsListContainer.getChildren().add(empty);
+            return;
+        }
+
+        for (Notification n : list) {
+            VBox card = new VBox(8);
+            card.getStyleClass().add(n.isRead() ? "notification-card-read" : "notification-card-unread");
+
+            // Header row
+            HBox topRow = new HBox(10);
+            topRow.setAlignment(Pos.CENTER_LEFT);
+
+            Label titleLbl = new Label(n.getTitle());
+            titleLbl.getStyleClass().add("notification-title");
+            topRow.getChildren().add(titleLbl);
+
+            if (!n.isRead()) {
+                Label unreadBadge = new Label("NEW");
+                unreadBadge.getStyleClass().add("badge-unread");
+                topRow.getChildren().add(unreadBadge);
+            }
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            Label timeLbl = new Label(n.getCreatedAt() != null ? DATE_FMT.format(n.getCreatedAt()) : "");
+            timeLbl.getStyleClass().add("notification-time");
+
+            topRow.getChildren().addAll(spacer, timeLbl);
+
+            // Message
+            Label bodyLbl = new Label(n.getMessage());
+            bodyLbl.getStyleClass().add("notification-body");
+            bodyLbl.setWrapText(true);
+
+            // Actions row
+            HBox actionsRow = new HBox(8);
+            actionsRow.setAlignment(Pos.CENTER_RIGHT);
+
+            if (!n.isRead()) {
+                Button markBtn = new Button("Mark as Read");
+                markBtn.getStyleClass().add("btn-small-outline");
+                markBtn.setOnAction(evt -> {
+                    Thread th = new Thread(() -> {
+                        try {
+                            boolean ok = notificationService.markAsRead(n.getNotificationId());
+                            if (ok) {
+                                List<Notification> updatedList = notificationService.getMyNotifications();
+                                int unread = notificationService.getMyUnreadCount();
+                                Platform.runLater(() -> {
+                                    renderNotificationList(updatedList);
+                                    updateNotificationBadgeText(unread);
+                                });
+                            }
+                        } catch (Exception ex) {
+                            LOGGER.log(Level.WARNING, "Error marking notification as read", ex);
+                        }
+                    }, "mark-read-thread");
+                    th.setDaemon(true);
+                    th.start();
+                });
+                actionsRow.getChildren().add(markBtn);
+            }
+
+            Button viewBtn = new Button("View Complaint");
+            viewBtn.getStyleClass().add("btn-small-primary");
+            viewBtn.setOnAction(evt -> {
+                showSection(myComplaintsSection, navMyComplaintsBtn);
+                openComplaintById(n.getComplaintId());
+            });
+            actionsRow.getChildren().add(viewBtn);
+
+            card.getChildren().addAll(topRow, bodyLbl, actionsRow);
+            notificationsListContainer.getChildren().add(card);
+        }
+    }
+
+    private void openComplaintById(int complaintId) {
+        for (Complaint c : allComplaints) {
+            if (c.getComplaintId() == complaintId) {
+                complaintsTable.getSelectionModel().select(c);
+                showHistoryDialog(c);
+                return;
+            }
+        }
+        Thread t = new Thread(() -> {
+            try {
+                ComplaintDAO dao = new ComplaintDAO();
+                Complaint c = dao.findById(complaintId);
+                if (c != null) {
+                    Platform.runLater(() -> {
+                        complaintsTable.getSelectionModel().select(c);
+                        showHistoryDialog(c);
+                    });
+                }
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "Error opening complaint by ID: " + complaintId, ex);
+            }
+        }, "open-complaint-thread");
+        t.setDaemon(true);
+        t.start();
     }
 
     private void setSubmitStatus(String msg, String cssClass) {

@@ -25,7 +25,7 @@ Built with **Java 21**, **JavaFX 21**, **JDBC**, and **MySQL** as part of an aca
 | Connectivity | JDBC (MySQL Connector) | 8.3.0   | Database connectivity via PreparedStatement |
 | Security     | BCrypt (jBCrypt)       | 0.4     | Salted password hashing (cost factor 12) |
 | Build Tool   | Apache Maven           | 3.10.0  | Dependency management and build lifecycle |
-| Testing      | JUnit Jupiter          | 5.10.2  | Automated unit and integration testing (70 tests) |
+| Testing      | JUnit Jupiter          | 5.10.2  | Automated unit and integration testing (95 tests) |
 
 ---
 
@@ -41,24 +41,27 @@ com.complainttracking/
 │   ├── Admin.java
 │   ├── Complaint.java              ← Full complaint entity with assignee & resolution info
 │   ├── ComplaintHistory.java       ← Audit trail event entity
-│   └── Resolution.java             ← Resolution notes and resolver metadata entity
+│   ├── Resolution.java             ← Resolution notes and resolver metadata entity
+│   └── Notification.java           ← User in-app notification entity
 ├── dao/                            ← Data Access Objects (JDBC PreparedStatement operations)
 │   ├── UserDAO.java
 │   ├── AdminDAO.java
-│   ├── ComplaintDAO.java           ← Multi-table queries, transactions (status, assign, resolve)
+│   ├── ComplaintDAO.java           ← Multi-table queries, transactions (status, assign, resolve, notifs)
 │   ├── ComplaintHistoryDAO.java
-│   └── ResolutionDAO.java          ← Resolution storage and retrieval
+│   ├── ResolutionDAO.java          ← Resolution storage and retrieval
+│   └── NotificationDAO.java        ← In-app notifications CRUD & transactional inserts
 ├── service/                        ← Business logic, validation, and transaction orchestrators
 │   ├── AuthenticationService.java
 │   ├── ComplaintService.java       ← User complaint creation & ownership validation
 │   ├── AdminComplaintService.java  ← Admin stats, filtering, assignees, status updates
-│   └── ResolutionService.java      ← State transition validation, resolution rules & transactions
+│   ├── ResolutionService.java      ← State transition validation, resolution rules & transactions
+│   └── NotificationService.java    ← Notification querying, ownership verification, unread counts
 ├── controller/                     ← JavaFX UI controllers (Event Handling)
-│   ├── WelcomeController.java
+│   ├── WelcomeController.java         ← Public entry & unauthenticated tracking lookup
 │   ├── UserLoginController.java
 │   ├── UserRegisterController.java
 │   ├── AdminLoginController.java
-│   ├── UserDashboardController.java   ← User portal: submit, track, view assignee & resolution
+│   ├── UserDashboardController.java   ← User portal: submit, track, view history, Notification Center
 │   └── AdminDashboardController.java  ← Admin portal: KPIs, status update, assign, resolve dialogs
 ├── database/                       ← JDBC connection singleton
 │   └── DatabaseConnection.java
@@ -92,6 +95,56 @@ ALTER TABLE complaints ADD CONSTRAINT fk_complaints_assigned_admin
     FOREIGN KEY (assigned_admin_id) REFERENCES admins(admin_id) ON DELETE SET NULL;
 CREATE INDEX idx_complaints_assigned_admin ON complaints(assigned_admin_id);
 ```
+
+### Phase 8 Migration Script (`database/migration_phase8.sql`)
+Executed to establish in-app user notifications:
+```sql
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    complaint_id INT NOT NULL,
+    title VARCHAR(100) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_notifications_complaint FOREIGN KEY (complaint_id) REFERENCES complaints(complaint_id) ON DELETE CASCADE,
+    INDEX idx_notifications_user_read (user_id, is_read),
+    INDEX idx_notifications_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+---
+
+## Phase 8: User Tracking & In-App Notifications
+
+### 1. Quick Complaint Tracking Lookup
+- **Public / Unauthenticated Lookup (Welcome Screen):**
+  - Accessible directly from the Welcome Screen via the **Track Status** card.
+  - Users enter their tracking code (e.g. `CMP-2026-5414`).
+  - Displays complaint code, title, category, priority, status, created/updated timestamps, and public status history timeline.
+  - **Privacy Enforcement:** Complainant personal details (full name, email, department, phone) and internal sensitive notes are stripped and protected from unauthorized harvesting.
+- **Authenticated Lookup (User Dashboard):**
+  - Accessible via the **Track by ID** navigation button in the User Portal sidebar.
+  - Users enter any tracking code.
+  - **Strict Ownership Enforcement:** The system checks `complaint.getUserId() == currentUser.getUserId()`. If a user attempts to access another person's complaint, an access denied security warning is displayed.
+
+### 2. In-App Notification Center
+- **Sidebar Badge:** Dynamic unread count indicator (e.g., `🔔 Notifications (3)`) in the User Portal sidebar, automatically refreshed on launch, after actions, and when new actions occur.
+- **Notification View:**
+  - Distinct visual styling for unread (`notification-card-unread` with blue accent and `NEW` pill) vs read (`notification-card-read`) notifications.
+  - Shows notification title, timestamp, contextual message with tracking ID, and quick actions.
+  - **Mark as Read:** Single-click per-notification status update.
+  - **Mark All as Read:** Global one-click clear button for all user notifications.
+  - **View Complaint Navigation:** Automatically navigates to **My Complaints**, highlights the corresponding complaint in the table, and displays its detailed history and resolution dialog.
+
+### 3. Transactional Notification Generation
+- Automatic notifications are generated for administrator actions within the **exact same JDBC Connection and Transaction (`conn.setAutoCommit(false)`)**:
+  - **Status Update:** "Your complaint {code} status has changed from {oldStatus} to {newStatus}."
+  - **Staff Assignment:** "Your complaint {code} has been assigned to staff for investigation."
+  - **Resolution:** "Your complaint {code} has been successfully resolved."
+- **Rollback Safety:** If notification insertion fails or throws an `SQLException`, the parent complaint transaction rolls back completely, ensuring strict consistency.
+- **Duplicate Prevention:** Resolution triggers only the "Complaint Resolved" notification without emitting redundant status update notifications.
 
 ---
 
@@ -170,7 +223,7 @@ $env:DB_URL  = "jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&s
 
 ## Building, Testing, and Running
 
-### Run Automated Unit Tests (70 tests)
+### Run Automated Unit Tests (95 tests)
 ```powershell
 mvn test
 ```

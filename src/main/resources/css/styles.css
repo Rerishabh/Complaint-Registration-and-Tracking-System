@@ -572,3 +572,77 @@
     -fx-effect: none;
 }
 
+/* ----------------------------------------------------------------
+   Phase 8: In-App Notifications & Tracking
+   ---------------------------------------------------------------- */
+.notification-card-unread {
+    -fx-background-color: #F0F7FF;
+    -fx-border-color: #93C5FD;
+    -fx-border-width: 1 1 1 4;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 14 18 14 18;
+}
+
+.notification-card-read {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E2E8F0;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 14 18 14 18;
+}
+
+.notification-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+}
+
+.notification-time {
+    -fx-font-size: 11px;
+    -fx-text-fill: #64748B;
+}
+
+.notification-body {
+    -fx-font-size: 13px;
+    -fx-text-fill: #334155;
+}
+
+.badge-unread {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 10;
+    -fx-padding: 2 6 2 6;
+}
+
+.btn-small-primary {
+    -fx-background-color: #2563EB;
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 10 4 10;
+    -fx-background-radius: 5;
+    -fx-cursor: hand;
+}
+.btn-small-primary:hover {
+    -fx-background-color: #1D4ED8;
+}
+
+.btn-small-outline {
+    -fx-background-color: transparent;
+    -fx-border-color: #CBD5E1;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+    -fx-text-fill: #475569;
+    -fx-font-size: 11px;
+    -fx-padding: 4 10 4 10;
+    -fx-cursor: hand;
+}
+.btn-small-outline:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #1E293B;
+}
+

@@ -45,6 +45,14 @@
                     text="&#128203;  My Complaints"
                     styleClass="nav-btn"
                     onAction="#handleNavMyComplaints"/>
+            <Button fx:id="navNotificationsBtn"
+                    text="&#128276;  Notifications"
+                    styleClass="nav-btn"
+                    onAction="#handleNavNotifications"/>
+            <Button fx:id="navTrackBtn"
+                    text="&#128269;  Track by ID"
+                    styleClass="nav-btn"
+                    onAction="#handleQuickTrack"/>
 
             <!-- Spacer -->
             <Region VBox.vgrow="ALWAYS"/>
@@ -234,6 +242,31 @@
                         <Label text="Tip: Select a row then click 'View History / Details' to see the full timeline."
                                styleClass="form-subtitle"/>
 
+                    </VBox>
+
+                    <!-- ========== SECTION 4: NOTIFICATIONS ========== -->
+                    <VBox fx:id="notificationsSection" spacing="16" visible="false" managed="false">
+                        <padding><Insets top="28" right="28" bottom="28" left="28"/></padding>
+
+                        <HBox alignment="CENTER_LEFT" spacing="16">
+                            <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                <Label text="Notification Center" styleClass="section-title"/>
+                                <Label text="Real-time updates on your registered complaints"
+                                       styleClass="section-subtitle"/>
+                            </VBox>
+                            <Button fx:id="markAllReadBtn"
+                                    text="&#10003;  Mark All as Read"
+                                    styleClass="btn-outline"
+                                    onAction="#handleMarkAllNotificationsRead"/>
+                            <Button text="&#8635;  Refresh"
+                                    styleClass="btn-outline"
+                                    onAction="#handleRefreshNotifications"/>
+                        </HBox>
+
+                        <!-- Notification items container -->
+                        <VBox fx:id="notificationsListContainer" spacing="12">
+                            <!-- Populated dynamically by controller -->
+                        </VBox>
                     </VBox>
 
                 </VBox>
