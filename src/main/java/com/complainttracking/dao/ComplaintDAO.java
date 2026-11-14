@@ -92,6 +92,18 @@ public class ComplaintDAO {
                     ps.setString(4, "Complaint submitted by user.");
                     ps.executeUpdate();
                 }
+
+                // 3. Fetch database-generated timestamps
+                final String selectTimestamps = "SELECT created_at, updated_at FROM complaints WHERE complaint_id = ?";
+                try (PreparedStatement ps = conn.prepareStatement(selectTimestamps)) {
+                    ps.setInt(1, generatedId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            complaint.setCreatedAt(rs.getTimestamp("created_at"));
+                            complaint.setUpdatedAt(rs.getTimestamp("updated_at"));
+                        }
+                    }
+                }
             }
 
             conn.commit();   // COMMIT

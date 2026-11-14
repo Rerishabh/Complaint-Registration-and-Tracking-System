@@ -124,6 +124,15 @@ public class ComplaintService {
                     "Failed to save complaint. Please check database connectivity and try again.");
         }
 
+        // 6. Ensure returned complaint has database-generated timestamp populated
+        if (complaint.getCreatedAt() == null) {
+            Complaint saved = complaintDAO.findById(generatedId);
+            if (saved != null && saved.getCreatedAt() != null) {
+                complaint.setCreatedAt(saved.getCreatedAt());
+                complaint.setUpdatedAt(saved.getUpdatedAt());
+            }
+        }
+
         LOGGER.log(Level.INFO, "Complaint submitted: ID={0}, tracking={1}",
                 new Object[]{generatedId, trackingCode});
         return complaint;

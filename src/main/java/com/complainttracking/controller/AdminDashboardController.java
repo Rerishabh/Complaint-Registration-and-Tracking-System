@@ -321,18 +321,26 @@ public class AdminDashboardController implements Initializable {
 
             // Execute in background
             Thread t = new Thread(() -> {
-                boolean ok = adminService.updateComplaintStatus(selected.getComplaintId(), newStatus, remarks);
-                Platform.runLater(() -> {
-                    if (ok) {
-                        showAlert(Alert.AlertType.INFORMATION, "Success",
-                                "Complaint [" + selected.getTrackingCode() + "] status updated to " + newStatus + ".");
-                        refreshAllComplaints();
-                        refreshDashboardData();
-                    } else {
-                        showAlert(Alert.AlertType.ERROR, "Error",
-                                "Failed to update complaint status. Please verify the transition rules and try again.");
-                    }
-                });
+                try {
+                    boolean ok = adminService.updateComplaintStatus(selected.getComplaintId(), newStatus, remarks);
+                    Platform.runLater(() -> {
+                        if (ok) {
+                            showAlert(Alert.AlertType.INFORMATION, "Success",
+                                    "Complaint [" + selected.getTrackingCode() + "] status updated to " + newStatus + ".");
+                            refreshAllComplaints();
+                            refreshDashboardData();
+                        } else {
+                            showAlert(Alert.AlertType.ERROR, "Error",
+                                    "Failed to update complaint status. Please verify the transition rules and try again.");
+                        }
+                    });
+                } catch (IllegalArgumentException | IllegalStateException ex) {
+                    Platform.runLater(() -> showAlert(Alert.AlertType.WARNING, "Cannot Update Status", ex.getMessage()));
+                } catch (Exception ex) {
+                    LOGGER.log(Level.SEVERE, "Unexpected error updating complaint status", ex);
+                    Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Error",
+                            "An unexpected error occurred: " + ex.getMessage()));
+                }
             }, "admin-status-update");
             t.setDaemon(true);
             t.start();
@@ -747,8 +755,21 @@ public class AdminDashboardController implements Initializable {
         } else {
             for (ComplaintHistory h : history) {
                 VBox item = new VBox(3);
-                String arrow = (h.getOldStatus() == null ? "—" : h.getOldStatus()) + "  →  " + h.getNewStatus();
-                Label statusLine = new Label(arrow);
+                String headerText;
+                if (h.getOldStatus() == null) {
+                    headerText = "—  →  " + h.getNewStatus();
+                } else if (h.isAssignmentEvent()) {
+                    if (h.getNote() != null && h.getNote().toLowerCase().contains("removed")) {
+                        headerText = "Assignment Removed";
+                    } else {
+                        headerText = "Staff Assigned";
+                    }
+                } else if (h.getOldStatus().equalsIgnoreCase(h.getNewStatus())) {
+                    headerText = "Status: " + h.getNewStatus();
+                } else {
+                    headerText = h.getOldStatus() + "  →  " + h.getNewStatus();
+                }
+                Label statusLine = new Label(headerText);
                 statusLine.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #1D4ED8;");
 
                 String meta = "By: " + h.getChangedBy() + (h.getChangedAt() != null ? "  ·  " + DATE_FMT.format(h.getChangedAt()) : "");

@@ -37,8 +37,15 @@ class ComplaintServiceTest {
         public int createComplaint(Complaint complaint, String submittedBy) {
             complaint.setComplaintId(lastReturnId);
             complaint.setStatus(Complaint.STATUS_OPEN);
+            complaint.setCreatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
+            complaint.setUpdatedAt(new java.sql.Timestamp(System.currentTimeMillis()));
             lastCreated = complaint;
             return lastReturnId;
+        }
+
+        @Override
+        public Complaint findById(int id) {
+            return lastCreated;
         }
 
         @Override
@@ -139,6 +146,7 @@ class ComplaintServiceTest {
         assertEquals(Complaint.STATUS_OPEN, c.getStatus());
         assertTrue(c.getTrackingCode().startsWith("CMP-"));
         assertEquals(42, c.getUserId());
+        assertNotNull(c.getCreatedAt(), "Newly submitted complaint must have a non-null createdAt timestamp");
     }
 
     @Test

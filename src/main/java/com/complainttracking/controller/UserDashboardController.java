@@ -475,9 +475,21 @@ public class UserDashboardController implements Initializable {
         } else {
             for (ComplaintHistory h : history) {
                 VBox item = new VBox(2);
-                String arrow = (h.getOldStatus() == null ? "—" : h.getOldStatus())
-                             + "  →  " + h.getNewStatus();
-                Label statusLine = new Label(arrow);
+                String headerText;
+                if (h.getOldStatus() == null) {
+                    headerText = "—  →  " + h.getNewStatus();
+                } else if (h.isAssignmentEvent()) {
+                    if (h.getNote() != null && h.getNote().toLowerCase().contains("removed")) {
+                        headerText = "Assignment Removed";
+                    } else {
+                        headerText = "Staff Assigned";
+                    }
+                } else if (h.getOldStatus().equalsIgnoreCase(h.getNewStatus())) {
+                    headerText = "Status: " + h.getNewStatus();
+                } else {
+                    headerText = h.getOldStatus() + "  →  " + h.getNewStatus();
+                }
+                Label statusLine = new Label(headerText);
                 statusLine.setStyle("-fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: #1D4ED8;");
                 String meta = "By " + h.getChangedBy()
                         + (h.getChangedAt() != null ? "  ·  " + DATE_FMT.format(h.getChangedAt()) : "");
@@ -725,11 +737,37 @@ public class UserDashboardController implements Initializable {
     }
 
     private void clearSubmitForm() {
-        titleField.clear();
-        categoryCombo.setValue(null);
-        priorityCombo.setValue(null);
-        locationField.clear();
-        descriptionArea.clear();
+        if (titleField != null) {
+            titleField.clear();
+        }
+        if (locationField != null) {
+            locationField.clear();
+        }
+        if (descriptionArea != null) {
+            descriptionArea.clear();
+        }
+
+        if (categoryCombo != null && categoryCombo.getItems() != null && !categoryCombo.getItems().isEmpty()) {
+            categoryCombo.getSelectionModel().selectFirst();
+        }
+
+        if (priorityCombo != null && priorityCombo.getItems() != null && !priorityCombo.getItems().isEmpty()) {
+            if (priorityCombo.getItems().contains("MEDIUM")) {
+                priorityCombo.setValue("MEDIUM");
+            } else if (priorityCombo.getItems().contains("Medium")) {
+                priorityCombo.setValue("Medium");
+            } else {
+                String mediumOption = priorityCombo.getItems().stream()
+                        .filter(item -> "MEDIUM".equalsIgnoreCase(item))
+                        .findFirst()
+                        .orElse(null);
+                if (mediumOption != null) {
+                    priorityCombo.setValue(mediumOption);
+                } else {
+                    priorityCombo.getSelectionModel().selectFirst();
+                }
+            }
+        }
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

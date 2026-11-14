@@ -175,6 +175,11 @@ public class AdminComplaintService {
         }
         String cleanNewStatus = newStatus.trim().toUpperCase();
 
+        // Prevent no-op status updates (e.g. OPEN -> OPEN, IN_PROGRESS -> IN_PROGRESS)
+        if (complaint.getStatus() != null && complaint.getStatus().trim().equalsIgnoreCase(cleanNewStatus)) {
+            throw new IllegalArgumentException("Complaint is already in status " + cleanNewStatus + ".");
+        }
+
         if (remarks == null || remarks.trim().isEmpty()) {
             throw new IllegalArgumentException("Remarks are required when updating status.");
         }

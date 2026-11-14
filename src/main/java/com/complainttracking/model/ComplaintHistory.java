@@ -76,6 +76,25 @@ public class ComplaintHistory {
     public Timestamp getChangedAt() { return changedAt; }
     public void setChangedAt(Timestamp changedAt) { this.changedAt = changedAt; }
 
+    /**
+     * Checks if this history entry represents a genuine status transition (e.g. OPEN -> IN_PROGRESS),
+     * rather than an assignment or non-transition update where old and new statuses are identical.
+     */
+    public boolean isStatusTransition() {
+        if (oldStatus == null) return true; // Initial submission transition (SUBMITTED -> OPEN)
+        return !oldStatus.equalsIgnoreCase(newStatus);
+    }
+
+    /**
+     * Checks if this history entry represents a staff assignment or reassignment event.
+     */
+    public boolean isAssignmentEvent() {
+        if (oldStatus != null && oldStatus.equalsIgnoreCase(newStatus)) {
+            return true;
+        }
+        return note != null && (note.toLowerCase().startsWith("assigned to ") || note.toLowerCase().startsWith("assignment removed"));
+    }
+
     @Override
     public String toString() {
         return "ComplaintHistory{id=" + historyId + ", complaintId=" + complaintId +

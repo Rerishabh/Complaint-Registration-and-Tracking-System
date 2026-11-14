@@ -47,9 +47,15 @@ class ResolutionServiceTest {
     static class StubComplaintDAO extends ComplaintDAO {
         final Map<Integer, Complaint> store = new HashMap<>();
         StubResolutionDAO resolutionDAO;
+        StubHistoryDAO historyDAO;
 
         StubComplaintDAO(StubResolutionDAO resDAO) {
+            this(resDAO, null);
+        }
+
+        StubComplaintDAO(StubResolutionDAO resDAO, StubHistoryDAO historyDAO) {
             this.resolutionDAO = resDAO;
+            this.historyDAO = historyDAO;
         }
 
         @Override
@@ -63,6 +69,17 @@ class ResolutionServiceTest {
             if (c == null) return false;
             c.setStatus(newStatus);
             c.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
+            if (historyDAO != null) {
+                historyDAO.histories.add(new ComplaintHistory(
+                        historyDAO.histories.size() + 1,
+                        complaintId,
+                        oldStatus,
+                        newStatus,
+                        changedBy,
+                        remarks,
+                        new Timestamp(System.currentTimeMillis())
+                ));
+            }
             return true;
         }
 
@@ -73,6 +90,17 @@ class ResolutionServiceTest {
             c.setAssignedAdminId(assignedAdminId);
             c.setAssignedAt(assignedAdminId != null ? new Timestamp(System.currentTimeMillis()) : null);
             c.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
+            if (historyDAO != null) {
+                historyDAO.histories.add(new ComplaintHistory(
+                        historyDAO.histories.size() + 1,
+                        complaintId,
+                        currentStatus,
+                        currentStatus,
+                        changedBy,
+                        remarks,
+                        new Timestamp(System.currentTimeMillis())
+                ));
+            }
             return true;
         }
 
@@ -145,9 +173,9 @@ class ResolutionServiceTest {
     @BeforeEach
     void setUp() {
         stubResolutionDAO = new StubResolutionDAO();
-        stubComplaintDAO = new StubComplaintDAO(stubResolutionDAO);
-        stubAdminDAO = new StubAdminDAO();
         stubHistoryDAO = new StubHistoryDAO();
+        stubComplaintDAO = new StubComplaintDAO(stubResolutionDAO, stubHistoryDAO);
+        stubAdminDAO = new StubAdminDAO();
 
         resolutionService = new ResolutionService(stubComplaintDAO, stubResolutionDAO);
         adminComplaintService = new AdminComplaintService(
@@ -340,11 +368,42 @@ class ResolutionServiceTest {
     class AdminStatusUpdateExecutionTests {
 
         @Test
-        @DisplayName("Successful status transition updates complaint in repository")
+        @DisplayName("Successful status transition updates complaint in repository and logs history")
         void testSuccessfulStatusUpdate() {
+            int historyCountBefore = stubHistoryDAO.findByComplaintId(101).size();
             boolean result = adminComplaintService.updateComplaintStatus(101, "IN_PROGRESS", "Assigning to tech team");
             assertTrue(result);
             assertEquals("IN_PROGRESS", stubComplaintDAO.store.get(101).getStatus());
+
+            List<ComplaintHistory> histories = stubHistoryDAO.findByComplaintId(101);
+            assertEquals(historyCountBefore + 1, histories.size());
+            ComplaintHistory latest = histories.get(histories.size() - 1);
+            assertEquals("OPEN", latest.getOldStatus());
+            assertEquals("IN_PROGRESS", latest.getNewStatus());
+            assertTrue(latest.isStatusTransition());
+            assertFalse(latest.isAssignmentEvent());
+        }
+
+        @Test
+        @DisplayName("No-op status update OPEN -> OPEN is rejected with IllegalArgumentException and creates no history")
+        void testNoOpStatusUpdateOpenToOpenRejected() {
+            int historyCountBefore = stubHistoryDAO.findByComplaintId(101).size();
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                    adminComplaintService.updateComplaintStatus(101, "OPEN", "Reaffirming open status"));
+            assertEquals("Complaint is already in status OPEN.", ex.getMessage());
+            assertEquals("OPEN", stubComplaintDAO.store.get(101).getStatus());
+            assertEquals(historyCountBefore, stubHistoryDAO.findByComplaintId(101).size());
+        }
+
+        @Test
+        @DisplayName("No-op status update IN_PROGRESS -> IN_PROGRESS is rejected with IllegalArgumentException and creates no history")
+        void testNoOpStatusUpdateInProgressToInProgressRejected() {
+            int historyCountBefore = stubHistoryDAO.findByComplaintId(102).size();
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                    adminComplaintService.updateComplaintStatus(102, "IN_PROGRESS", "Still working"));
+            assertEquals("Complaint is already in status IN_PROGRESS.", ex.getMessage());
+            assertEquals("IN_PROGRESS", stubComplaintDAO.store.get(102).getStatus());
+            assertEquals(historyCountBefore, stubHistoryDAO.findByComplaintId(102).size());
         }
 
         @Test
@@ -382,18 +441,31 @@ class ResolutionServiceTest {
     class AssignmentTests {
 
         @Test
-        @DisplayName("Successfully assign complaint to valid staff member")
+        @DisplayName("Successfully assign complaint to valid staff member and record assignment history without changing status")
         void testAssignToValidStaff() {
+            Complaint original = stubComplaintDAO.store.get(101);
+            assertEquals("OPEN", original.getStatus());
+
             boolean result = adminComplaintService.assignComplaint(101, 20, "Please inspect projector cable.");
             assertTrue(result);
 
             Complaint updated = stubComplaintDAO.store.get(101);
             assertEquals(20, updated.getAssignedAdminId());
             assertNotNull(updated.getAssignedAt());
+            assertEquals("OPEN", updated.getStatus(), "Assigning complaint must not change complaint status");
+
+            // Verify assignment history event
+            List<ComplaintHistory> histories = stubHistoryDAO.findByComplaintId(101);
+            assertFalse(histories.isEmpty());
+            ComplaintHistory latest = histories.get(histories.size() - 1);
+            assertTrue(latest.isAssignmentEvent(), "Assignment must be classified as an assignment event");
+            assertFalse(latest.isStatusTransition(), "Assignment must not create a false status transition");
+            assertTrue(latest.getNote().contains("Assigned to Bob Officer"));
+            assertTrue(latest.getNote().contains("Please inspect projector cable."));
         }
 
         @Test
-        @DisplayName("Successfully unassign complaint (set assigned_admin_id to null)")
+        @DisplayName("Successfully unassign complaint (set assigned_admin_id to null) and record history")
         void testUnassignComplaint() {
             // First assign
             adminComplaintService.assignComplaint(101, 20, "Initial assignment");
@@ -406,6 +478,13 @@ class ResolutionServiceTest {
             Complaint updated = stubComplaintDAO.store.get(101);
             assertNull(updated.getAssignedAdminId());
             assertNull(updated.getAssignedAt());
+            assertEquals("OPEN", updated.getStatus(), "Unassigning complaint must preserve complaint status");
+
+            List<ComplaintHistory> histories = stubHistoryDAO.findByComplaintId(101);
+            ComplaintHistory latest = histories.get(histories.size() - 1);
+            assertTrue(latest.isAssignmentEvent());
+            assertFalse(latest.isStatusTransition());
+            assertTrue(latest.getNote().contains("Assignment removed"));
         }
 
         @Test
@@ -683,6 +762,39 @@ class ResolutionServiceTest {
             String tableDisplay = (mapped.getAssignedAdminName() != null && !mapped.getAssignedAdminName().trim().isEmpty())
                     ? mapped.getAssignedAdminName() : "Not Assigned";
             assertEquals("Sarah Admin", tableDisplay);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. Timeline Rendering Classification Tests
+    // -----------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Timeline Rendering Classification Tests")
+    class TimelineRenderingClassificationTests {
+
+        @Test
+        @DisplayName("ComplaintHistory accurately classifies genuine status transitions vs assignment events")
+        void testComplaintHistoryClassification() {
+            // Initial submission (null -> OPEN) is a status transition, not an assignment
+            ComplaintHistory initial = new ComplaintHistory(1, 101, null, "OPEN", "User", "Submitted", new Timestamp(System.currentTimeMillis()));
+            assertTrue(initial.isStatusTransition(), "Initial submission is a status transition");
+            assertFalse(initial.isAssignmentEvent(), "Initial submission is not an assignment event");
+
+            // Genuine transition (OPEN -> IN_PROGRESS)
+            ComplaintHistory transition = new ComplaintHistory(2, 101, "OPEN", "IN_PROGRESS", "Admin", "Investigation started", new Timestamp(System.currentTimeMillis()));
+            assertTrue(transition.isStatusTransition(), "OPEN -> IN_PROGRESS is a genuine status transition");
+            assertFalse(transition.isAssignmentEvent(), "Status update is not an assignment event");
+
+            // Assignment event (OPEN -> OPEN with note Assigned to...)
+            ComplaintHistory assignment = new ComplaintHistory(3, 101, "OPEN", "OPEN", "Admin", "Assigned to Bob Officer – Check cable", new Timestamp(System.currentTimeMillis()));
+            assertFalse(assignment.isStatusTransition(), "Assignment with identical status is not a status transition");
+            assertTrue(assignment.isAssignmentEvent(), "Assignment note and identical status is an assignment event");
+
+            // Unassignment event (IN_PROGRESS -> IN_PROGRESS with note Assignment removed)
+            ComplaintHistory unassignment = new ComplaintHistory(4, 101, "IN_PROGRESS", "IN_PROGRESS", "Admin", "Assignment removed", new Timestamp(System.currentTimeMillis()));
+            assertFalse(unassignment.isStatusTransition(), "Unassignment with identical status is not a status transition");
+            assertTrue(unassignment.isAssignmentEvent(), "Assignment removed is an assignment event");
         }
     }
 }
