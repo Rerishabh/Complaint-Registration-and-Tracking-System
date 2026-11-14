@@ -25,7 +25,7 @@ Built with **Java 21**, **JavaFX 21**, **JDBC**, and **MySQL** as part of an aca
 | Connectivity | JDBC (MySQL Connector) | 8.3.0   | Database connectivity via PreparedStatement |
 | Security     | BCrypt (jBCrypt)       | 0.4     | Salted password hashing (cost factor 12) |
 | Build Tool   | Apache Maven           | 3.10.0  | Dependency management and build lifecycle |
-| Testing      | JUnit Jupiter          | 5.10.2  | Automated unit and integration testing (95 tests) |
+| Testing      | JUnit Jupiter          | 5.10.2  | Automated unit and integration testing (116 tests) |
 
 ---
 
@@ -42,27 +42,32 @@ com.complainttracking/
 │   ├── Complaint.java              ← Full complaint entity with assignee & resolution info
 │   ├── ComplaintHistory.java       ← Audit trail event entity
 │   ├── Resolution.java             ← Resolution notes and resolver metadata entity
-│   └── Notification.java           ← User in-app notification entity
+│   ├── Notification.java           ← User in-app notification entity
+│   ├── ReportSummary.java          ← Consolidated executive metrics & chart summaries
+│   ├── DepartmentStat.java         ← Department-wise complaint aggregations
+│   └── StaffPerformance.java       ← Staff resolution volume, speed, and percentage
 ├── dao/                            ← Data Access Objects (JDBC PreparedStatement operations)
 │   ├── UserDAO.java
 │   ├── AdminDAO.java
 │   ├── ComplaintDAO.java           ← Multi-table queries, transactions (status, assign, resolve, notifs)
 │   ├── ComplaintHistoryDAO.java
 │   ├── ResolutionDAO.java          ← Resolution storage and retrieval
-│   └── NotificationDAO.java        ← In-app notifications CRUD & transactional inserts
+│   ├── NotificationDAO.java        ← In-app notifications CRUD & transactional inserts
+│   └── ReportDAO.java              ← Analytical queries, distributions, trends & performance
 ├── service/                        ← Business logic, validation, and transaction orchestrators
 │   ├── AuthenticationService.java
 │   ├── ComplaintService.java       ← User complaint creation & ownership validation
 │   ├── AdminComplaintService.java  ← Admin stats, filtering, assignees, status updates
 │   ├── ResolutionService.java      ← State transition validation, resolution rules & transactions
-│   └── NotificationService.java    ← Notification querying, ownership verification, unread counts
+│   ├── NotificationService.java    ← Notification querying, ownership verification, unread counts
+│   └── ReportService.java          ← Admin authorization, date-range filtering & CSV export
 ├── controller/                     ← JavaFX UI controllers (Event Handling)
 │   ├── WelcomeController.java         ← Public entry & unauthenticated tracking lookup
 │   ├── UserLoginController.java
 │   ├── UserRegisterController.java
 │   ├── AdminLoginController.java
 │   ├── UserDashboardController.java   ← User portal: submit, track, view history, Notification Center
-│   └── AdminDashboardController.java  ← Admin portal: KPIs, status update, assign, resolve dialogs
+│   └── AdminDashboardController.java  ← Admin portal: KPIs, status, assign, resolve & Analytical Reports
 ├── database/                       ← JDBC connection singleton
 │   └── DatabaseConnection.java
 └── util/                           ← Session management & navigation helpers
@@ -148,6 +153,66 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 ---
 
+## Phase 9: Administrative Analytical Reports & Dashboard Charts
+
+Phase 9 integrates comprehensive executive analytics, interactive JavaFX charts, date-range filtering, department breakdowns, staff performance rankings, and formatted CSV export into the Administrator Portal.
+
+### 1. Executive KPI Metrics
+- **Total Complaints:** Total registered volume within the active date scope.
+- **Resolution Rate (%):**
+  $$\text{Resolution Rate} = \left(\frac{\text{Resolved Complaints}}{\text{Total Complaints}}\right) \times 100$$
+  *(Safe calculation prevents division by zero when total complaints is 0).*
+- **Resolved Complaints:** Total complaints marked as `RESOLVED` (distinct from `CLOSED`).
+- **Pending Complaints:** Cumulative count of active complaints (`OPEN` + `IN_PROGRESS`).
+- **Average Resolution Time (hours):** Average duration from complaint creation (`created_at`) to formal resolution (`resolved_at`) for resolved complaints.
+
+### 2. Interactive JavaFX Charts
+- **Category-Wise Distribution (`PieChart`):** Proportional distribution of complaints across categories (Hardware, Software, Network, Facility, etc.) with category labels and exact volume counts.
+- **Complaints by Status (`BarChart<String, Number>`):** Frequency comparison across all five supported system statuses (`OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `REJECTED`).
+- **Department-Wise Statistics (`BarChart<String, Number>`):** Identifies organizational departments with the highest volume of submitted complaints.
+- **Monthly Registration Trends (`LineChart<String, Number>`):** Chronological trend visualization formatted as `YYYY-MM` to monitor issue patterns over time.
+
+### 3. Date-Range Filtering
+- **Start Date & End Date DatePickers:** Integrated into the Reports toolbar for dynamic time-scoped analysis.
+- **Boundary Handling:**
+  - If neither date is chosen, full historical data is processed.
+  - If start date only is chosen, all complaints from `startDate 00:00:00` onward are included.
+  - If end date only is chosen, all complaints through `endDate 23:59:59` are included.
+  - Full date-range captures all activity between start and end dates inclusively.
+  - Rejects invalid configurations where `startDate > endDate` with an informative warning.
+- **Reset Button:** Instantly clears date inputs and restores all-time metrics.
+
+### 4. Staff Performance Analytics
+A dedicated JavaFX `TableView<StaffPerformance>` evaluates staff efficiency and resolution throughput:
+- **Staff Name & Role:** Full administrator name and assigned role (`ADMIN`, `STAFF`, `SUPERADMIN`).
+- **Assigned Volume:** Total distinct complaints assigned via `complaints.assigned_admin_id`.
+- **Resolved Volume:** Total assigned complaints brought to `RESOLVED` or `CLOSED` state.
+- **Resolution Rate (%):** Percentage of assigned complaints successfully resolved.
+- **Average Resolution Time (hrs):** Average turnaround time in hours computed per staff member.
+
+### 5. CSV Report Export
+- **One-Click Export:** The **Export CSV** toolbar button opens a native JavaFX `FileChooser` dialog defaulting to `CRTS_Analytical_Report_YYYY-MM-DD.csv`.
+- **Formatted Report Structure:**
+  1. Title and generation timestamp.
+  2. Active reporting period description.
+  3. Executive KPI summary table.
+  4. Status distribution breakdown.
+  5. Category distribution table.
+  6. Chronological monthly trend summary.
+  7. Department breakdown table.
+  8. Staff performance metrics table.
+- **Compliance & Security:**
+  - Includes UTF-8 Byte Order Mark (`\ufeff`) for direct Excel compatibility.
+  - Full RFC 4180 CSV escaping for commas, double quotes, and multi-line strings.
+  - Does NOT export password hashes, credentials, or sensitive authentication details.
+
+### 6. Security & Authorization
+- Access to analytical reports and export APIs is restricted strictly to active administrator sessions (`SessionManager.getInstance().isAdminLoggedIn()`).
+- Normal user sessions and unauthenticated requests attempting to access analytical reporting throw a `SecurityException`.
+- Analytical database queries run sequentially off the JavaFX Application Thread inside a dedicated background worker (`report-loading-thread`) with safe UI updates via `Platform.runLater()`.
+
+---
+
 ## Status Transition Lifecycle & Business Rules
 
 All status changes are strictly controlled through `ResolutionService.isValidStatusTransition(...)` and committed inside single JDBC transactions (`conn.setAutoCommit(false)`):
@@ -223,7 +288,7 @@ $env:DB_URL  = "jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&s
 
 ## Building, Testing, and Running
 
-### Run Automated Unit Tests (95 tests)
+### Run Automated Unit Tests (116 tests)
 ```powershell
 mvn test
 ```

@@ -3,9 +3,13 @@ package com.complainttracking.controller;
 import com.complainttracking.model.Admin;
 import com.complainttracking.model.Complaint;
 import com.complainttracking.model.ComplaintHistory;
+import com.complainttracking.model.DepartmentStat;
+import com.complainttracking.model.ReportSummary;
 import com.complainttracking.model.Resolution;
+import com.complainttracking.model.StaffPerformance;
 import com.complainttracking.service.AdminComplaintService;
 import com.complainttracking.service.ComplaintService;
+import com.complainttracking.service.ReportService;
 import com.complainttracking.service.ResolutionService;
 import com.complainttracking.util.NavigationHelper;
 import com.complainttracking.util.SessionManager;
@@ -20,12 +24,21 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import java.io.File;
 import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,10 +64,12 @@ public class AdminDashboardController implements Initializable {
     // ---- Sidebar nav buttons ----
     @FXML private Button navOverviewBtn;
     @FXML private Button navAllComplaintsBtn;
+    @FXML private Button navReportsBtn;
 
     // ---- Content sections ----
     @FXML private VBox overviewSection;
     @FXML private VBox allComplaintsSection;
+    @FXML private VBox reportsSection;
 
     // ---- Overview KPI labels ----
     @FXML private Label kpiTotal;
@@ -89,6 +104,44 @@ public class AdminDashboardController implements Initializable {
     @FXML private TableColumn<Complaint, String> colStatus;
     @FXML private TableColumn<Complaint, String> colAssigned;
     @FXML private TableColumn<Complaint, String> colDate;
+
+    // ---- Reports Filter Toolbar ----
+    @FXML private DatePicker reportStartDatePicker;
+    @FXML private DatePicker reportEndDatePicker;
+    @FXML private Button btnApplyReportFilter;
+    @FXML private Button btnResetReportFilter;
+    @FXML private Button btnExportReportCsv;
+    @FXML private Label reportStatusLabel;
+
+    // ---- Reports Executive KPI Cards ----
+    @FXML private Label kpiReportTotal;
+    @FXML private Label kpiReportResolutionRate;
+    @FXML private Label kpiReportResolved;
+    @FXML private Label kpiReportPending;
+    @FXML private Label kpiReportAvgTime;
+
+    // ---- Reports Charts ----
+    @FXML private PieChart categoryPieChart;
+    @FXML private BarChart<String, Number> statusBarChart;
+    @FXML private BarChart<String, Number> departmentBarChart;
+    @FXML private LineChart<String, Number> monthlyTrendsChart;
+
+    @FXML private CategoryAxis statusXAxis;
+    @FXML private CategoryAxis departmentXAxis;
+    @FXML private CategoryAxis monthlyTrendsXAxis;
+
+    // ---- Staff Performance Table ----
+    @FXML private TableView<StaffPerformance> staffPerformanceTable;
+    @FXML private TableColumn<StaffPerformance, String> colStaffName;
+    @FXML private TableColumn<StaffPerformance, String> colStaffRole;
+    @FXML private TableColumn<StaffPerformance, Number> colStaffAssigned;
+    @FXML private TableColumn<StaffPerformance, Number> colStaffResolved;
+    @FXML private TableColumn<StaffPerformance, String> colStaffRate;
+    @FXML private TableColumn<StaffPerformance, String> colStaffAvgTime;
+
+    // ---- Phase 9 Service & Cache ----
+    private final ReportService reportService = new ReportService();
+    private ReportSummary currentReportSummary;
 
     // ---- Service & Data ----
     private final AdminComplaintService adminService = new AdminComplaintService();
@@ -128,6 +181,8 @@ public class AdminDashboardController implements Initializable {
         // Setup Tables
         setupRecentTable();
         setupComplaintsTable();
+        setupStaffPerformanceTable();
+        setupCharts();
 
         // Setup FilteredList
         filteredComplaints = new FilteredList<>(allComplaints, c -> true);
@@ -160,6 +215,14 @@ public class AdminDashboardController implements Initializable {
     private void handleNavAllComplaints(ActionEvent e) {
         showSection(allComplaintsSection, navAllComplaintsBtn);
         refreshAllComplaints();
+    }
+
+    @FXML
+    private void handleNavReports(ActionEvent e) {
+        showSection(reportsSection, navReportsBtn);
+        if (currentReportSummary == null) {
+            refreshReportsData();
+        }
     }
 
     @FXML
@@ -736,13 +799,247 @@ public class AdminDashboardController implements Initializable {
         overviewSection.setManaged(false);
         allComplaintsSection.setVisible(false);
         allComplaintsSection.setManaged(false);
+        reportsSection.setVisible(false);
+        reportsSection.setManaged(false);
 
         section.setVisible(true);
         section.setManaged(true);
 
-        navOverviewBtn.getStyleClass().remove("nav-btn-active");
-        navAllComplaintsBtn.getStyleClass().remove("nav-btn-active");
-        activeNav.getStyleClass().add("nav-btn-active");
+        for (Button b : new Button[]{navOverviewBtn, navAllComplaintsBtn, navReportsBtn}) {
+            if (b != null) {
+                b.getStyleClass().remove("nav-btn-active");
+            }
+        }
+        if (activeNav != null) {
+            activeNav.getStyleClass().add("nav-btn-active");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase 9: Analytical Reports & Charts Handlers
+    // -----------------------------------------------------------------------
+
+    private void setupStaffPerformanceTable() {
+        staffPerformanceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
+        colStaffName.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStaffName()));
+        colStaffRole.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getRole() != null ? d.getValue().getRole().toUpperCase() : ""));
+        colStaffAssigned.setCellValueFactory(d -> new SimpleIntegerProperty(d.getValue().getAssignedComplaints()));
+        colStaffResolved.setCellValueFactory(d -> new SimpleIntegerProperty(d.getValue().getResolvedComplaints()));
+        colStaffRate.setCellValueFactory(d -> new SimpleStringProperty(String.format("%.1f%%", d.getValue().getResolutionRate())));
+        colStaffAvgTime.setCellValueFactory(d -> new SimpleStringProperty(String.format("%.1f hrs", d.getValue().getAvgResolutionTimeHours())));
+    }
+
+    private void setupCharts() {
+        if (statusBarChart != null) {
+            statusBarChart.setAnimated(false);
+            statusBarChart.setCategoryGap(24);
+            statusBarChart.setBarGap(4);
+        }
+        if (departmentBarChart != null) {
+            departmentBarChart.setAnimated(false);
+            departmentBarChart.setCategoryGap(24);
+            departmentBarChart.setBarGap(4);
+        }
+        if (monthlyTrendsChart != null) {
+            monthlyTrendsChart.setAnimated(false);
+        }
+        if (categoryPieChart != null) {
+            categoryPieChart.setAnimated(false);
+        }
+
+        if (statusXAxis != null) {
+            statusXAxis.setAnimated(false);
+            statusXAxis.setGapStartAndEnd(true);
+        }
+        if (departmentXAxis != null) {
+            departmentXAxis.setAnimated(false);
+            departmentXAxis.setGapStartAndEnd(true);
+            departmentXAxis.setTickLabelRotation(-15);
+        }
+        if (monthlyTrendsXAxis != null) {
+            monthlyTrendsXAxis.setAnimated(false);
+            monthlyTrendsXAxis.setGapStartAndEnd(true);
+            monthlyTrendsXAxis.setTickLabelRotation(-20);
+        }
+    }
+
+    @FXML
+    private void handleApplyReportFilter(ActionEvent e) {
+        refreshReportsData();
+    }
+
+    @FXML
+    private void handleResetReportFilter(ActionEvent e) {
+        if (reportStartDatePicker != null) reportStartDatePicker.setValue(null);
+        if (reportEndDatePicker != null)   reportEndDatePicker.setValue(null);
+        refreshReportsData();
+    }
+
+    @FXML
+    private void handleExportReportCsv(ActionEvent e) {
+        if (currentReportSummary == null) {
+            showAlert(Alert.AlertType.INFORMATION, "No Data", "Please generate a report first before exporting.");
+            return;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Analytical Report to CSV");
+        String defaultFileName = "CRTS_Analytical_Report_" + LocalDate.now() + ".csv";
+        fileChooser.setInitialFileName(defaultFileName);
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files (*.csv)", "*.csv"));
+
+        Stage stage = (Stage) (navReportsBtn != null && navReportsBtn.getScene() != null ?
+                navReportsBtn.getScene().getWindow() : navOverviewBtn.getScene().getWindow());
+
+        File file = fileChooser.showSaveDialog(stage);
+        if (file != null) {
+            try {
+                reportService.exportReportToCsv(currentReportSummary, file);
+                showAlert(Alert.AlertType.INFORMATION, "Export Successful",
+                        "Analytical report successfully exported to:\n" + file.getAbsolutePath());
+            } catch (Exception ex) {
+                LOGGER.log(Level.SEVERE, "Failed to export CSV report", ex);
+                showAlert(Alert.AlertType.ERROR, "Export Failed",
+                        "Could not export CSV file: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void refreshReportsData() {
+        LocalDate start = reportStartDatePicker != null ? reportStartDatePicker.getValue() : null;
+        LocalDate end   = reportEndDatePicker != null ? reportEndDatePicker.getValue() : null;
+
+        if (start != null && end != null && start.isAfter(end)) {
+            showAlert(Alert.AlertType.WARNING, "Invalid Date Range",
+                    "Start date (" + start + ") cannot be after end date (" + end + ").");
+            if (reportStatusLabel != null) {
+                reportStatusLabel.setText("Error: Start date cannot be after end date.");
+            }
+            return;
+        }
+
+        if (reportStatusLabel != null) {
+            reportStatusLabel.setText("Generating reports...");
+        }
+
+        Thread t = new Thread(() -> {
+            try {
+                ReportSummary summary = reportService.getReportSummary(start, end);
+
+                Platform.runLater(() -> {
+                    currentReportSummary = summary;
+                    renderReportsUI(summary);
+                    if (reportStatusLabel != null) {
+                        reportStatusLabel.setText("Updated: " + summary.getTotalComplaints() + " complaints analyzed.");
+                    }
+                });
+            } catch (Exception ex) {
+                LOGGER.log(Level.WARNING, "Error loading analytical report data", ex);
+                Platform.runLater(() -> {
+                    if (reportStatusLabel != null) {
+                        reportStatusLabel.setText("Failed to load report data.");
+                    }
+                    showAlert(Alert.AlertType.ERROR, "Report Error",
+                            "Could not generate analytical report: " + ex.getMessage());
+                });
+            }
+        }, "report-loading-thread");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void renderReportsUI(ReportSummary summary) {
+        // 1. Executive KPI Cards
+        kpiReportTotal.setText(String.valueOf(summary.getTotalComplaints()));
+        kpiReportResolutionRate.setText(String.format("%.1f%%", summary.getResolutionRate()));
+        kpiReportResolved.setText(String.valueOf(summary.getResolvedComplaints()));
+        kpiReportPending.setText(String.valueOf(summary.getPendingComplaints()));
+        kpiReportAvgTime.setText(String.format("%.1f hrs", summary.getAvgResolutionTimeHours()));
+
+        // 2. Category PieChart
+        categoryPieChart.getData().clear();
+        for (Map.Entry<String, Integer> entry : summary.getCategoryDistribution().entrySet()) {
+            if (entry.getValue() > 0) {
+                categoryPieChart.getData().add(new PieChart.Data(entry.getKey() + " (" + entry.getValue() + ")", entry.getValue()));
+            }
+        }
+
+        // 3. Status BarChart
+        statusBarChart.getData().clear();
+        CategoryAxis sAxis = (statusXAxis != null) ? statusXAxis : (CategoryAxis) statusBarChart.getXAxis();
+        ObservableList<String> statusCategories = FXCollections.observableArrayList(
+                "OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", "REJECTED"
+        );
+        sAxis.setCategories(statusCategories);
+
+        XYChart.Series<String, Number> statusSeries = new XYChart.Series<>();
+        statusSeries.setName("Status");
+        Map<String, Integer> statusDist = summary.getStatusDistribution();
+        for (String status : statusCategories) {
+            int count = (statusDist != null) ? statusDist.getOrDefault(status, 0) : 0;
+            statusSeries.getData().add(new XYChart.Data<>(status, count));
+        }
+        statusBarChart.getData().add(statusSeries);
+
+        // 4. Department BarChart
+        departmentBarChart.getData().clear();
+        CategoryAxis dAxis = (departmentXAxis != null) ? departmentXAxis : (CategoryAxis) departmentBarChart.getXAxis();
+        ObservableList<String> deptCategories = FXCollections.observableArrayList();
+        List<DepartmentStat> deptStats = summary.getDepartmentStats();
+        if (deptStats != null && !deptStats.isEmpty()) {
+            for (DepartmentStat stat : deptStats) {
+                String name = (stat.getDepartmentName() != null && !stat.getDepartmentName().trim().isEmpty())
+                        ? stat.getDepartmentName().trim() : "Unassigned";
+                if (!deptCategories.contains(name)) {
+                    deptCategories.add(name);
+                }
+            }
+        }
+        if (deptCategories.isEmpty()) {
+            deptCategories.add("No Data");
+        }
+        dAxis.setCategories(deptCategories);
+
+        XYChart.Series<String, Number> deptSeries = new XYChart.Series<>();
+        deptSeries.setName("Department");
+        if (deptStats != null && !deptStats.isEmpty()) {
+            for (DepartmentStat stat : deptStats) {
+                String name = (stat.getDepartmentName() != null && !stat.getDepartmentName().trim().isEmpty())
+                        ? stat.getDepartmentName().trim() : "Unassigned";
+                deptSeries.getData().add(new XYChart.Data<>(name, stat.getTotalComplaints()));
+            }
+        } else {
+            deptSeries.getData().add(new XYChart.Data<>("No Data", 0));
+        }
+        departmentBarChart.getData().add(deptSeries);
+
+        // 5. Monthly Trends LineChart
+        monthlyTrendsChart.getData().clear();
+        CategoryAxis mAxis = (monthlyTrendsXAxis != null) ? monthlyTrendsXAxis : (CategoryAxis) monthlyTrendsChart.getXAxis();
+        ObservableList<String> monthCategories = FXCollections.observableArrayList();
+        Map<String, Integer> monthlyTrends = summary.getMonthlyTrends();
+        if (monthlyTrends != null && !monthlyTrends.isEmpty()) {
+            monthCategories.addAll(monthlyTrends.keySet());
+        }
+        if (monthCategories.isEmpty()) {
+            monthCategories.add("No Data");
+        }
+        mAxis.setCategories(monthCategories);
+
+        XYChart.Series<String, Number> trendSeries = new XYChart.Series<>();
+        trendSeries.setName("New Registrations");
+        if (monthlyTrends != null && !monthlyTrends.isEmpty()) {
+            for (Map.Entry<String, Integer> entry : monthlyTrends.entrySet()) {
+                trendSeries.getData().add(new XYChart.Data<>(entry.getKey(), entry.getValue()));
+            }
+        } else {
+            trendSeries.getData().add(new XYChart.Data<>("No Data", 0));
+        }
+        monthlyTrendsChart.getData().add(trendSeries);
+
+        // 6. Staff Performance Table
+        staffPerformanceTable.setItems(FXCollections.observableArrayList(summary.getStaffPerformance()));
     }
 
     private void showAlert(Alert.AlertType type, String title, String content) {

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.*?>
+<?import javafx.scene.chart.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
@@ -46,6 +47,11 @@
                     text="&#128203;  All Complaints"
                     styleClass="nav-btn"
                     onAction="#handleNavAllComplaints"/>
+
+            <Button fx:id="navReportsBtn"
+                    text="&#128202;  Analytical Reports"
+                    styleClass="nav-btn"
+                    onAction="#handleNavReports"/>
 
             <!-- Spacer -->
             <Region VBox.vgrow="ALWAYS"/>
@@ -228,6 +234,155 @@
 
                         <Label text="Tip: Select any row and click 'View Details' to inspect the complaint description, contact details, and status history."
                                styleClass="form-subtitle"/>
+
+                    </VBox>
+
+                    <!-- ========== SECTION 3: ANALYTICAL REPORTS ========== -->
+                    <VBox fx:id="reportsSection" spacing="20" visible="false" managed="false">
+                        <padding><Insets top="28" right="28" bottom="28" left="28"/></padding>
+
+                        <!-- Section Header -->
+                        <VBox spacing="4">
+                            <Label text="Analytical Reports &amp; Charts" styleClass="section-title"/>
+                            <Label text="Executive overview, distribution analytics, trend charts, and staff performance" styleClass="section-subtitle"/>
+                        </VBox>
+
+                        <!-- Reports Filter Toolbar -->
+                        <HBox spacing="12" alignment="CENTER_LEFT" styleClass="filter-card">
+                            <padding><Insets top="14" right="18" bottom="14" left="18"/></padding>
+
+                            <Label text="Start Date:" style="-fx-font-weight: bold; -fx-text-fill: #334155;"/>
+                            <DatePicker fx:id="reportStartDatePicker" promptText="YYYY-MM-DD" prefWidth="135"/>
+
+                            <Label text="End Date:" style="-fx-font-weight: bold; -fx-text-fill: #334155;"/>
+                            <DatePicker fx:id="reportEndDatePicker" promptText="YYYY-MM-DD" prefWidth="135"/>
+
+                            <Button fx:id="btnApplyReportFilter"
+                                    text="&#128269; Apply Filter"
+                                    styleClass="btn-primary"
+                                    onAction="#handleApplyReportFilter"/>
+
+                            <Button fx:id="btnResetReportFilter"
+                                    text="&#10226; Reset"
+                                    styleClass="btn-outline"
+                                    onAction="#handleResetReportFilter"/>
+
+                            <Region HBox.hgrow="ALWAYS"/>
+
+                            <Label fx:id="reportStatusLabel" text="" styleClass="form-subtitle"/>
+
+                            <Button fx:id="btnExportReportCsv"
+                                    text="&#128229; Export CSV"
+                                    styleClass="btn-success"
+                                    onAction="#handleExportReportCsv"/>
+                        </HBox>
+
+                        <!-- Executive KPI Cards -->
+                        <HBox spacing="14">
+                            <!-- Total Complaints -->
+                            <VBox styleClass="kpi-card" alignment="CENTER" spacing="6" HBox.hgrow="ALWAYS">
+                                <padding><Insets top="18" right="16" bottom="18" left="16"/></padding>
+                                <Label fx:id="kpiReportTotal" text="0" styleClass="kpi-value"/>
+                                <Label text="TOTAL COMPLAINTS" styleClass="kpi-label"/>
+                            </VBox>
+
+                            <!-- Resolution Rate -->
+                            <VBox styleClass="kpi-card kpi-done" alignment="CENTER" spacing="6" HBox.hgrow="ALWAYS">
+                                <padding><Insets top="18" right="16" bottom="18" left="16"/></padding>
+                                <Label fx:id="kpiReportResolutionRate" text="0.0%" styleClass="kpi-value" style="-fx-text-fill: #059669;"/>
+                                <Label text="RESOLUTION RATE" styleClass="kpi-label"/>
+                            </VBox>
+
+                            <!-- Resolved Complaints -->
+                            <VBox styleClass="kpi-card" alignment="CENTER" spacing="6" HBox.hgrow="ALWAYS">
+                                <padding><Insets top="18" right="16" bottom="18" left="16"/></padding>
+                                <Label fx:id="kpiReportResolved" text="0" styleClass="kpi-value" style="-fx-text-fill: #2563EB;"/>
+                                <Label text="RESOLVED" styleClass="kpi-label"/>
+                            </VBox>
+
+                            <!-- Pending Complaints -->
+                            <VBox styleClass="kpi-card kpi-open" alignment="CENTER" spacing="6" HBox.hgrow="ALWAYS">
+                                <padding><Insets top="18" right="16" bottom="18" left="16"/></padding>
+                                <Label fx:id="kpiReportPending" text="0" styleClass="kpi-value" style="-fx-text-fill: #D97706;"/>
+                                <Label text="PENDING" styleClass="kpi-label"/>
+                            </VBox>
+
+                            <!-- Avg Resolution Time -->
+                            <VBox styleClass="kpi-card" alignment="CENTER" spacing="6" HBox.hgrow="ALWAYS">
+                                <padding><Insets top="18" right="16" bottom="18" left="16"/></padding>
+                                <Label fx:id="kpiReportAvgTime" text="0.0 hrs" styleClass="kpi-value" style="-fx-text-fill: #7C3AED;"/>
+                                <Label text="AVG RESOLUTION TIME" styleClass="kpi-label"/>
+                            </VBox>
+                        </HBox>
+
+                        <!-- Chart Row 1: Category Distribution & Status Distribution -->
+                        <HBox spacing="16">
+                            <!-- Category Pie Chart -->
+                            <VBox styleClass="chart-card" HBox.hgrow="ALWAYS" prefWidth="480">
+                                <PieChart fx:id="categoryPieChart" title="Complaints by Category" legendSide="BOTTOM" prefHeight="330" animated="false"/>
+                            </VBox>
+
+                            <!-- Status Bar Chart -->
+                            <VBox styleClass="chart-card" HBox.hgrow="ALWAYS" prefWidth="480">
+                                <BarChart fx:id="statusBarChart" title="Complaints by Status" legendVisible="false" prefHeight="330" animated="false">
+                                    <xAxis>
+                                        <CategoryAxis fx:id="statusXAxis" label="Status" animated="false"/>
+                                    </xAxis>
+                                    <yAxis>
+                                        <NumberAxis label="Count" animated="false"/>
+                                    </yAxis>
+                                </BarChart>
+                            </VBox>
+                        </HBox>
+
+                        <!-- Chart Row 2: Department Distribution & Monthly Trends -->
+                        <HBox spacing="16">
+                            <!-- Department Bar Chart -->
+                            <VBox styleClass="chart-card" HBox.hgrow="ALWAYS" prefWidth="480">
+                                <BarChart fx:id="departmentBarChart" title="Complaints by Department" legendVisible="false" prefHeight="330" animated="false">
+                                    <xAxis>
+                                        <CategoryAxis fx:id="departmentXAxis" label="Department" animated="false"/>
+                                    </xAxis>
+                                    <yAxis>
+                                        <NumberAxis label="Count" animated="false"/>
+                                    </yAxis>
+                                </BarChart>
+                            </VBox>
+
+                            <!-- Monthly Trends Line Chart -->
+                            <VBox styleClass="chart-card" HBox.hgrow="ALWAYS" prefWidth="480">
+                                <LineChart fx:id="monthlyTrendsChart" title="Monthly Registration Trends" legendVisible="false" prefHeight="330" animated="false">
+                                    <xAxis>
+                                        <CategoryAxis fx:id="monthlyTrendsXAxis" label="Month (YYYY-MM)" animated="false"/>
+                                    </xAxis>
+                                    <yAxis>
+                                        <NumberAxis label="New Registrations" animated="false"/>
+                                    </yAxis>
+                                </LineChart>
+                            </VBox>
+                        </HBox>
+
+                        <!-- Staff Performance Section -->
+                        <VBox spacing="10">
+                            <VBox spacing="2">
+                                <Label text="Staff Resolution Performance" styleClass="section-title" style="-fx-font-size: 18px;"/>
+                                <Label text="Assignment volume, completion counts, resolution percentage, and turnaround speed by staff member" styleClass="section-subtitle"/>
+                            </VBox>
+
+                            <TableView fx:id="staffPerformanceTable" prefHeight="260">
+                                <columns>
+                                    <TableColumn fx:id="colStaffName"     text="Staff Name"            prefWidth="200" minWidth="150"/>
+                                    <TableColumn fx:id="colStaffRole"     text="Role"                  prefWidth="130" minWidth="100"/>
+                                    <TableColumn fx:id="colStaffAssigned" text="Assigned Complaints"   prefWidth="150" minWidth="120"/>
+                                    <TableColumn fx:id="colStaffResolved" text="Resolved Complaints"   prefWidth="150" minWidth="120"/>
+                                    <TableColumn fx:id="colStaffRate"     text="Resolution Rate"       prefWidth="140" minWidth="120"/>
+                                    <TableColumn fx:id="colStaffAvgTime"  text="Avg. Resolution Time"  prefWidth="160" minWidth="140"/>
+                                </columns>
+                                <placeholder>
+                                    <Label text="No staff performance records available for this reporting period." styleClass="form-subtitle"/>
+                                </placeholder>
+                            </TableView>
+                        </VBox>
 
                     </VBox>
 
