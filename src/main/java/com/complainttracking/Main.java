@@ -34,8 +34,10 @@ public class Main extends Application {
 
             primaryStage.setTitle("Complaint Registration and Tracking System");
             primaryStage.setScene(scene);
-            primaryStage.setMinWidth(800);
-            primaryStage.setMinHeight(550);
+            primaryStage.setMinWidth(1024);
+            primaryStage.setMinHeight(680);
+            primaryStage.setWidth(1200);
+            primaryStage.setHeight(760);
             primaryStage.centerOnScreen();
             primaryStage.show();
 

@@ -6,19 +6,18 @@ import com.complainttracking.util.NavigationHelper;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.stage.Stage;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Controller for AdminLogin.fxml.
- * Handles administrator authentication and session creation.
+ * Handles administrator authentication, session establishment, and navigation to AdminDashboard.fxml.
  */
 public class AdminLoginController {
 
@@ -52,20 +51,22 @@ public class AdminLoginController {
         }
 
         loginButton.setDisable(true);
-        statusLabel.setText("Authenticating administrator...");
-        statusLabel.getStyleClass().removeAll("status-error", "status-ok");
-        statusLabel.getStyleClass().add("status-checking");
+        setStatus("Authenticating administrator...", "status-checking");
 
         Thread authThread = new Thread(() -> {
             try {
                 Admin admin = authService.loginAdmin(username, password);
                 Platform.runLater(() -> {
                     loginButton.setDisable(false);
-                    statusLabel.setText("Admin login successful!");
-                    statusLabel.getStyleClass().removeAll("status-checking", "status-error");
-                    statusLabel.getStyleClass().add("status-ok");
+                    setStatus("Admin login successful! Loading dashboard...", "form-success-label");
 
-                    showConfirmationAlert(admin);
+                    // Navigate directly to AdminDashboard.fxml
+                    Stage stage = (Stage) loginButton.getScene().getWindow();
+                    NavigationHelper.navigateToStage(
+                            stage,
+                            "/fxml/AdminDashboard.fxml",
+                            "Admin Dashboard – " + admin.getFullName() + " – CRTS"
+                    );
                 });
             } catch (IllegalArgumentException e) {
                 Platform.runLater(() -> {
@@ -93,22 +94,16 @@ public class AdminLoginController {
     }
 
     private void showError(String message) {
-        statusLabel.setText(message);
-        statusLabel.getStyleClass().removeAll("status-checking", "status-ok");
-        statusLabel.getStyleClass().add("status-error");
+        setStatus(message, "form-error-label");
     }
 
-    private void showConfirmationAlert(Admin admin) {
-        Alert alert = new Alert(AlertType.INFORMATION);
-        alert.setTitle("Admin Authentication Successful");
-        alert.setHeaderText("Welcome, " + admin.getFullName() + "!");
-        alert.setContentText(
-                "Name: " + admin.getFullName() + "\n" +
-                "Username: " + admin.getUsername() + "\n" +
-                "Role: " + admin.getRole() + "\n\n" +
-                "Your administrator session is active. Admin Dashboard functionality will be available in Phase 10."
-        );
-        alert.showAndWait();
+    private void setStatus(String message, String cssClass) {
+        statusLabel.getStyleClass().removeAll(
+                "status-checking", "status-ok", "status-error",
+                "form-success-label", "form-error-label");
+        statusLabel.setText(message);
+        if (cssClass != null && !cssClass.isEmpty()) {
+            statusLabel.getStyleClass().add(cssClass);
+        }
     }
 }
-

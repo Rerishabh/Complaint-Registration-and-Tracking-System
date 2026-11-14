@@ -470,6 +470,7 @@
 .kpi-open    { -fx-border-color: #FBBF24; }
 .kpi-inprog  { -fx-border-color: #60A5FA; }
 .kpi-done    { -fx-border-color: #34D399; }
+.kpi-rejected{ -fx-border-color: #F87171; }
 
 /* Section headings inside dashboard content area */
 .section-title {

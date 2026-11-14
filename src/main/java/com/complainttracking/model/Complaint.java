@@ -45,6 +45,17 @@ public class Complaint {
     private Timestamp createdAt;
     private Timestamp updatedAt;
 
+    // Optional complainant fields populated via SQL JOIN with users table
+    private String complainantName;
+    private String complainantEmail;
+    private String complainantDepartment;
+
+    // Optional assignment and resolution fields
+    private Integer   assignedAdminId;
+    private String    assignedAdminName;
+    private Timestamp assignedAt;
+    private String    resolutionNotes;
+
     /** Default constructor. */
     public Complaint() {
     }
@@ -78,6 +89,20 @@ public class Complaint {
         this.updatedAt    = updatedAt;
     }
 
+    /** Full constructor with complainant information. */
+    public Complaint(int complaintId, String trackingCode, int userId,
+                     String title, String description, String category,
+                     String priority, String status,
+                     Timestamp createdAt, Timestamp updatedAt,
+                     String complainantName, String complainantEmail,
+                     String complainantDepartment) {
+        this(complaintId, trackingCode, userId, title, description, category,
+             priority, status, createdAt, updatedAt);
+        this.complainantName       = complainantName;
+        this.complainantEmail      = complainantEmail;
+        this.complainantDepartment = complainantDepartment;
+    }
+
     // --- Getters & Setters ---
 
     public int getComplaintId() { return complaintId; }
@@ -109,6 +134,27 @@ public class Complaint {
 
     public Timestamp getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Timestamp updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getComplainantName() { return complainantName; }
+    public void setComplainantName(String complainantName) { this.complainantName = complainantName; }
+
+    public String getComplainantEmail() { return complainantEmail; }
+    public void setComplainantEmail(String complainantEmail) { this.complainantEmail = complainantEmail; }
+
+    public String getComplainantDepartment() { return complainantDepartment; }
+    public void setComplainantDepartment(String complainantDepartment) { this.complainantDepartment = complainantDepartment; }
+
+    public Integer getAssignedAdminId() { return assignedAdminId; }
+    public void setAssignedAdminId(Integer assignedAdminId) { this.assignedAdminId = assignedAdminId; }
+
+    public String getAssignedAdminName() { return assignedAdminName; }
+    public void setAssignedAdminName(String assignedAdminName) { this.assignedAdminName = assignedAdminName; }
+
+    public Timestamp getAssignedAt() { return assignedAt; }
+    public void setAssignedAt(Timestamp assignedAt) { this.assignedAt = assignedAt; }
+
+    public String getResolutionNotes() { return resolutionNotes; }
+    public void setResolutionNotes(String resolutionNotes) { this.resolutionNotes = resolutionNotes; }
 
     @Override
     public String toString() {

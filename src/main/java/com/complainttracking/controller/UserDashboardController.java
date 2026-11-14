@@ -88,6 +88,7 @@ public class UserDashboardController implements Initializable {
     @FXML private TableColumn<Complaint, String> colCategory;
     @FXML private TableColumn<Complaint, String> colPriority;
     @FXML private TableColumn<Complaint, String> colStatus;
+    @FXML private TableColumn<Complaint, String> colAssigned;
     @FXML private TableColumn<Complaint, String> colDate;
 
     // ---- Data ----
@@ -237,6 +238,13 @@ public class UserDashboardController implements Initializable {
                     // Recent = top 5
                     recentTable.setItems(FXCollections.observableArrayList(
                             complaints.subList(0, Math.min(5, complaints.size()))));
+
+                    if (!recentTable.getColumns().isEmpty()) {
+                        recentTable.scrollToColumn(recentTable.getColumns().get(0));
+                    }
+                    if (!complaintsTable.getColumns().isEmpty()) {
+                        complaintsTable.scrollToColumn(complaintsTable.getColumns().get(0));
+                    }
                 });
             } catch (Exception ex) {
                 LOGGER.log(Level.WARNING, "Error loading dashboard data", ex);
@@ -269,6 +277,8 @@ public class UserDashboardController implements Initializable {
     // -----------------------------------------------------------------------
 
     private void setupRecentTable() {
+        recentTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
         recentTrackingCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getTrackingCode()));
         recentTitleCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getTitle()));
         recentStatusCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStatus()));
@@ -278,11 +288,17 @@ public class UserDashboardController implements Initializable {
     }
 
     private void setupComplaintsTable() {
+        complaintsTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+
         colTracking.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getTrackingCode()));
         colTitle.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getTitle()));
         colCategory.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getCategory()));
         colPriority.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getPriority()));
         colStatus.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().getStatus()));
+        colAssigned.setCellValueFactory(d -> {
+            String name = d.getValue().getAssignedAdminName();
+            return new SimpleStringProperty((name != null && !name.trim().isEmpty()) ? name : "Not Assigned");
+        });
         colDate.setCellValueFactory(d -> new SimpleStringProperty(
                 d.getValue().getCreatedAt() != null
                         ? DATE_FMT.format(d.getValue().getCreatedAt()) : ""));
@@ -333,17 +349,40 @@ public class UserDashboardController implements Initializable {
         GridPane grid = new GridPane();
         grid.setHgap(14);
         grid.setVgap(8);
-        addRow(grid, 0, "Title",    c.getTitle());
-        addRow(grid, 1, "Category", c.getCategory());
-        addRow(grid, 2, "Priority", c.getPriority());
-        addRow(grid, 3, "Status",   c.getStatus());
-        addRow(grid, 4, "Submitted", c.getCreatedAt() != null ? DATE_FMT.format(c.getCreatedAt()) : "");
+        addRow(grid, 0, "Title",          c.getTitle());
+        addRow(grid, 1, "Category",       c.getCategory());
+        addRow(grid, 2, "Priority",       c.getPriority());
+        addRow(grid, 3, "Status",         c.getStatus());
+        addRow(grid, 4, "Assigned Staff", (c.getAssignedAdminName() != null && !c.getAssignedAdminName().trim().isEmpty())
+                ? c.getAssignedAdminName() : "Not Assigned");
+        addRow(grid, 5, "Submitted",      c.getCreatedAt() != null ? DATE_FMT.format(c.getCreatedAt()) : "");
+        addRow(grid, 6, "Last Updated",   c.getUpdatedAt() != null ? DATE_FMT.format(c.getUpdatedAt()) : "");
 
         Label descHead = new Label("Description");
         descHead.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
         Label descText = new Label(c.getDescription());
         descText.setWrapText(true);
         descText.setStyle("-fx-font-size: 13px; -fx-text-fill: #334155;");
+
+        content.getChildren().addAll(grid, descHead, descText);
+
+        // Resolution section if resolved or notes exist
+        if (c.getResolutionNotes() != null && !c.getResolutionNotes().isEmpty()) {
+            Separator sepRes = new Separator();
+            Label resHead = new Label("Resolution Information");
+            resHead.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #16A34A;");
+
+            VBox resBox = new VBox(6);
+            resBox.setStyle("-fx-background-color: #F0FDF4; -fx-border-color: #86EFAC; -fx-border-radius: 6; "
+                    + "-fx-background-radius: 6; -fx-padding: 10;");
+
+            Label notes = new Label(c.getResolutionNotes());
+            notes.setWrapText(true);
+            notes.setStyle("-fx-font-size: 13px; -fx-text-fill: #14532D;");
+
+            resBox.getChildren().add(notes);
+            content.getChildren().addAll(sepRes, resHead, resBox);
+        }
 
         Separator sep = new Separator();
 
@@ -378,7 +417,7 @@ public class UserDashboardController implements Initializable {
             }
         }
 
-        content.getChildren().addAll(grid, descHead, descText, sep, histHead, histItems);
+        content.getChildren().addAll(sep, histHead, histItems);
 
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);

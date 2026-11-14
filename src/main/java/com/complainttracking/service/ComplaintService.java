@@ -148,10 +148,16 @@ public class ComplaintService {
 
     /**
      * Returns the full audit history for a specific complaint.
+     * Enforces user ownership check.
      *
      * @param complaintId the complaint's primary key
      */
     public List<ComplaintHistory> getHistory(int complaintId) {
+        User currentUser = requireSession();
+        Complaint c = complaintDAO.findById(complaintId);
+        if (c != null && c.getUserId() != currentUser.getUserId()) {
+            throw new SecurityException("Unauthorized: You can only view history for your own complaints.");
+        }
         return historyDAO.findByComplaintId(complaintId);
     }
 

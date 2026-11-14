@@ -53,7 +53,7 @@ public final class NavigationHelper {
 
             Scene scene = stage.getScene();
             if (scene == null) {
-                scene = new Scene(root, 900, 600);
+                scene = new Scene(root, 1200, 760);
                 String css = NavigationHelper.class.getResource(STYLESHEET_PATH).toExternalForm();
                 scene.getStylesheets().add(css);
                 stage.setScene(scene);
@@ -63,6 +63,20 @@ public final class NavigationHelper {
                 if (!scene.getStylesheets().contains(css)) {
                     scene.getStylesheets().add(css);
                 }
+            }
+
+            stage.setMinWidth(1024);
+            stage.setMinHeight(680);
+
+            // Ensure window expands to at least 1200x760 for dashboards
+            if (fxmlPath.contains("Dashboard")) {
+                if (stage.getWidth() < 1200) {
+                    stage.setWidth(1200);
+                }
+                if (stage.getHeight() < 760) {
+                    stage.setHeight(760);
+                }
+                stage.centerOnScreen();
             }
 
             if (title != null && !title.isEmpty()) {

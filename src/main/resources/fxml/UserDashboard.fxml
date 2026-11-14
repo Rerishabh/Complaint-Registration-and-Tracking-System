@@ -14,7 +14,7 @@
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.complainttracking.controller.UserDashboardController"
-            prefWidth="1050" prefHeight="680"
+            prefWidth="1200" prefHeight="760"
             styleClass="root-pane">
 
     <!-- =================== LEFT SIDEBAR =================== -->
@@ -217,12 +217,13 @@
                         <!-- Complaints Table -->
                         <TableView fx:id="complaintsTable" VBox.vgrow="ALWAYS" prefHeight="380">
                             <columns>
-                                <TableColumn fx:id="colTracking"  text="Tracking ID" prefWidth="130"/>
-                                <TableColumn fx:id="colTitle"     text="Title"        prefWidth="230"/>
-                                <TableColumn fx:id="colCategory"  text="Category"     prefWidth="130"/>
-                                <TableColumn fx:id="colPriority"  text="Priority"     prefWidth="90"/>
-                                <TableColumn fx:id="colStatus"    text="Status"       prefWidth="110"/>
-                                <TableColumn fx:id="colDate"      text="Submitted"    prefWidth="170"/>
+                                <TableColumn fx:id="colTracking"  text="Tracking ID"   prefWidth="130" minWidth="110"/>
+                                <TableColumn fx:id="colTitle"     text="Title"          prefWidth="220" minWidth="150"/>
+                                <TableColumn fx:id="colCategory"  text="Category"       prefWidth="130" minWidth="110"/>
+                                <TableColumn fx:id="colPriority"  text="Priority"       prefWidth="90"  minWidth="80"/>
+                                <TableColumn fx:id="colStatus"    text="Status"         prefWidth="110" minWidth="95"/>
+                                <TableColumn fx:id="colAssigned"  text="Assigned Staff" prefWidth="140" minWidth="120"/>
+                                <TableColumn fx:id="colDate"      text="Submitted"      prefWidth="160" minWidth="140"/>
                             </columns>
                             <placeholder>
                                 <Label text="No complaints found matching your filter."
