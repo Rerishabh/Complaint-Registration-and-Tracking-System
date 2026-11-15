@@ -1,8 +1,12 @@
 package com.complainttracking.database;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -57,13 +61,13 @@ public final class DatabaseConnection {
     }
 
     /**
-     * Creates a new JDBC connection using environment variables when
-     * available, falling back to the compiled-in defaults.
+     * Creates a new JDBC connection using environment variables or
+     * external db.properties when available, falling back to compiled-in defaults.
      */
     private static Connection createConnection() throws SQLException {
-        String url  = resolveEnv("DB_URL",  DEFAULT_URL);
-        String user = resolveEnv("DB_USER", DEFAULT_USER);
-        String pass = resolveEnv("DB_PASS", DEFAULT_PASS);
+        String url  = resolveConfig("DB_URL",  "db.url",  DEFAULT_URL);
+        String user = resolveConfig("DB_USER", "db.user", DEFAULT_USER);
+        String pass = resolveConfig("DB_PASS", "db.pass", DEFAULT_PASS);
 
         LOGGER.log(Level.INFO,
                 "Connecting to database: {0} as user: {1}", new Object[]{url, user});
@@ -114,8 +118,71 @@ public final class DatabaseConnection {
     }
 
     // ---------------------------------------------------------------
-    // Helpers
+    // Helpers & External Configuration
     // ---------------------------------------------------------------
+
+    /**
+     * Resolves a configuration value with the following precedence:
+     * <ol>
+     *   <li>Environment variable (e.g. {@code DB_PASS})</li>
+     *   <li>Java System property (e.g. {@code DB_PASS} or {@code db.pass})</li>
+     *   <li>External {@code db.properties} file in working directory or {@code ~/.crts/db.properties}</li>
+     *   <li>Fallback default</li>
+     * </ol>
+     */
+    private static String resolveConfig(String envKey, String propKey, String fallback) {
+        // 1. Environment variable
+        String value = System.getenv(envKey);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        // 2. Java system property
+        value = System.getProperty(envKey);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+        value = System.getProperty(propKey);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        // 3. External db.properties file
+        Properties props = loadExternalProperties();
+        value = props.getProperty(propKey);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+        value = props.getProperty(envKey);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+
+        // 4. Default fallback
+        return fallback;
+    }
+
+    /**
+     * Loads configuration from an external db.properties file if present.
+     * Looks in:
+     * 1. Current working directory (./db.properties)
+     * 2. User home directory (~/.crts/db.properties)
+     */
+    private static Properties loadExternalProperties() {
+        Properties props = new Properties();
+        File file = new File("db.properties");
+        if (!file.exists()) {
+            file = new File(System.getProperty("user.home"), ".crts" + File.separator + "db.properties");
+        }
+        if (file.exists() && file.isFile()) {
+            try (FileInputStream fis = new FileInputStream(file)) {
+                props.load(fis);
+            } catch (IOException e) {
+                LOGGER.log(Level.WARNING, "Failed to read external db.properties: {0}", e.getMessage());
+            }
+        }
+        return props;
+    }
 
     /**
      * Reads an environment variable; returns {@code fallback} when absent

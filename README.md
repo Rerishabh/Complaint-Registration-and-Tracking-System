@@ -19,6 +19,7 @@ Students and institutional users can register accounts, submit categorized compl
 - [Project Structure](#project-structure)
 - [Database Configuration](#database-configuration)
 - [Installation and Setup](#installation-and-setup)
+- [Standalone Windows Application Packaging](#standalone-windows-application-packaging)
 - [Automated Testing](#automated-testing)
 - [Security Practices](#security-practices)
 - [Future Enhancements](#future-enhancements)
@@ -303,6 +304,81 @@ $env:DB_URL  = "jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&s
    ```powershell
    mvn javafx:run
    ```
+
+---
+
+## Standalone Windows Application Packaging
+
+CRTS can be packaged as a self-contained Windows application using JDK 21 `jpackage`. The generated package bundles its own dedicated Java runtime and JavaFX libraries, allowing teammates to run the application without installing JDK, JavaFX SDK, or Maven.
+
+### 1. Packaging Availability & Requirements
+
+- **Tested Format**: Windows Standalone Application Directory (`--type app-image`), verified on Windows 10/11. The resulting executable is located at `dist/ComplaintTrackingSystem/ComplaintTrackingSystem.exe`.
+- **Planned Single-File Installer**: Generating a single-file `.exe` or `.msi` Windows setup wizard requires [WiX Toolset v3.11+](https://wixtoolset.org/) installed and added to `PATH`. On systems without WiX, `jpackage` produces the fully functional standalone application directory (`app-image`).
+- **MySQL Prerequisite**: Each teammate must have MySQL Server 8.0+ running locally on port 3306.
+
+### 2. Database Initialization for Teammates
+
+Before launching the standalone application, create and populate the local database:
+
+1. Open PowerShell in the project root.
+2. Execute the database scripts in order:
+   ```powershell
+   mysql -u root -p -e "source database/schema.sql;"
+   mysql -u root -p -e "source database/migration_phase7.sql;"
+   mysql -u root -p -e "source database/migration_phase8.sql;"
+   ```
+   *(Each teammate maintains independent local complaint records.)*
+
+### 3. Database Credential Configuration
+
+The standalone executable resolves credentials in the following order:
+1. Windows Environment Variables (`DB_USER`, `DB_PASS`, `DB_URL`).
+2. Optional external `db.properties` file placed in the application root directory or user home (`~/.crts/db.properties`).
+3. Default compiled fallback (`root` user, empty password, `localhost:3306/complaint_tracking_db`).
+
+To configure via Windows User Environment Variables:
+```powershell
+[System.Environment]::SetEnvironmentVariable("DB_USER", "root", "User")
+[System.Environment]::SetEnvironmentVariable("DB_PASS", "<your_mysql_password>", "User")
+```
+
+Alternatively, create a `db.properties` file in `dist/ComplaintTrackingSystem/`:
+```properties
+db.user=root
+db.pass=<your_mysql_password>
+db.url=jdbc:mysql://localhost:3306/complaint_tracking_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+```
+
+### 4. Build and Package Commands
+
+To stage dependencies and build the standalone Windows application:
+
+```powershell
+# Step 1: Compile, run tests, and stage dependencies to target/jpackage-input/
+mvn clean package
+
+# Step 2: Generate the self-contained Windows application image
+jpackage --name ComplaintTrackingSystem `
+  --app-version 1.0.0 `
+  --vendor "CRTS Development Team" `
+  --dest dist `
+  --input target/jpackage-input `
+  --main-jar complaint-tracking-system-1.0-SNAPSHOT.jar `
+  --main-class com.complainttracking.Launcher `
+  --type app-image
+
+# (Optional) If WiX Toolset v3.11+ is installed, build an .exe installer:
+# jpackage --name ComplaintTrackingSystem --app-version 1.0.0 --vendor "CRTS Development Team" --dest dist --input target/jpackage-input --main-jar complaint-tracking-system-1.0-SNAPSHOT.jar --main-class com.complainttracking.Launcher --type exe --win-shortcut --win-menu
+```
+
+### 5. Launch the Application
+
+Run the generated executable directly from Windows Explorer or PowerShell:
+
+```powershell
+.\dist\ComplaintTrackingSystem\ComplaintTrackingSystem.exe
+```
 
 ---
 
