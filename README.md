@@ -1,8 +1,34 @@
 # Complaint Registration and Tracking System (CRTS)
+[![Latest Release](https://img.shields.io/github/v/release/Rerishabh/Complaint-Registration-and-Tracking-System)](https://github.com/Rerishabh/Complaint-Registration-and-Tracking-System/releases/latest)
 
 The **Complaint Registration and Tracking System (CRTS)** is a desktop application developed in Java and JavaFX for educational and institutional environments. The platform streamlines issue reporting, status lifecycle management, staff assignment, and complaint resolution.
 
 Students and institutional users can register accounts, submit categorized complaints with specified priority levels, receive automatic tracking identifiers, monitor progress through an audit timeline, and review in-app status updates. Administrators can monitor system-wide key performance indicators (KPIs), inspect incoming complaints, enforce valid status transitions, assign tickets to staff, record resolution notes, review analytical charts, and export reports to CSV.
+
+---
+
+## 📥 Download Windows Application
+
+The latest portable Windows release is available here:
+
+**[Download CRTS Windows Application v1.0.0](https://github.com/Rerishabh/Complaint-Registration-and-Tracking-System/releases/tag/v1.0.0)**
+
+- Version: v1.0.0
+- Platform: Windows 10/11 (64-bit)
+- Package: Portable ZIP (65.45 MB)
+- Java 21 and JavaFX 21 runtimes are bundled.
+- No separate JDK, JavaFX SDK, or Maven installation is required to run the packaged application.
+
+### Quick Start
+
+1. Download `CRTS-Windows-1.0.0.zip` from the Releases page.
+2. Extract the ZIP file.
+3. Install and start MySQL Server 8.0+.
+4. Execute the database SQL scripts in the order described in the Database Setup section.
+5. Configure your database credentials.
+6. Launch `ComplaintTrackingSystem.exe`.
+
+**Note:** Each user requires their own local MySQL database. Records are not automatically synchronized between computers.
 
 ---
 
@@ -23,7 +49,7 @@ Students and institutional users can register accounts, submit categorized compl
 - [Automated Testing](#automated-testing)
 - [Security Practices](#security-practices)
 - [Future Enhancements](#future-enhancements)
-- [Author](#author)
+
 
 ---
 
@@ -441,7 +467,3 @@ The following features represent planned future enhancements:
 
 ---
 
-## Author
-
-- **Rishabh Paira**
-- **GitHub**: [https://github.com/Rerishabh](https://github.com/Rerishabh)
